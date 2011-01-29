@@ -297,12 +297,160 @@ iaca_set_cardinaldef (IacaValue *v, int def)
 static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
 
 /***************** SHARED ITEM VALUES ****************/
+
+/* item payload */
+enum iacapayloadkind_en
+{
+  IACAPAYLOAD__NONE,
+  IACAPAYLOAD_VECTOR,
+  IACAPAYLOAD_DICTIONNARY,
+};
+
+/* item structure */
 struct iacaitem_st
 {
   unsigned v_kind;		/* always IACAV_ITEM */
-  unsigned v_nbattr;		/* the number of attributes */
-  int64_t v_ident;		/* the unique identifying number */
+  enum iacapayloadkind_en v_payloadkind;	/* the variable payload kind */
+  int64_t v_ident;		/* the immutable unique identifying number */
+  struct iacatabattr_st *v_attrtab;	/* the hash table of attribute
+					   entries */
+  IacaValue *v_itemcontent;	/* the mutable item content */
+  struct iacaspace_st *v_space;	/* the item space defines where it is
+				   persisted */
+  /* anonymous union of pointers for payload */
+  union
+  {
+    void *v_payptr;
+    struct iacavectorpayload_st *v_payvect;
+    struct iacadictionnary_st *v_paydict;
+  };
 };
+
+struct iacaentryattr_st
+{
+  IacaItem *en_item;		/* an item, or IACA_EMPTY_SLOT */
+#define IACA_EMPTY_SLOT  ((IacaItem*)-1L)
+  IacaValue *en_val;
+};
+
+struct iacatabattr_st
+{
+  unsigned at_size;		/* allocated prime size */
+  unsigned at_count;		/* used count */
+  struct iacaentryattr_st at_entab[];	/* size is at_size */
+};
+
+/** implementation of item physical attribute getting **/
+
+/* internal UNSAFE routine returning the index of an attribute inside
+   a table, or else -1. Don't call it unless you are sure that tbl is
+   a non-null table, and itat is an item! */
+static inline int
+iaca_item_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
+{
+  unsigned sz = tbl->at_size;
+  unsigned h = itat->v_ident % sz;
+  for (unsigned ix = h; ix < sz; ix++)
+    {
+      IacaItem *curit = tbl->at_entab[ix].en_item;
+      if (curit == itat)
+	return (int) ix;
+      else if (curit == IACA_EMPTY_SLOT)	/* emptied slot */
+	continue;
+      else if (!curit)
+	return -1;
+    }
+  for (unsigned ix = 0; ix < h; ix++)
+    {
+      IacaItem *curit = tbl->at_entab[ix].en_item;
+      if (curit == itat)
+	return (int) ix;
+      else if (curit == IACA_EMPTY_SLOT)	/* emptied slot */
+	continue;
+      else if (!curit)
+	return -1;
+    }
+  return -1;
+}
+
+/* in item vitem, physically get the value associate to attribute
+   vattr or else default vdef */
+static inline IacaValue *
+iaca_item_attribute_physical_getdef (IacaValue *vitem, IacaValue *vattr,
+				     IacaValue *vdef)
+{
+  IacaItem *item = 0;
+  IacaItem *attr = 0;
+  struct iacatabattr_st *tbl = 0;
+  int ix = -1;
+  if (!vitem || vitem->v_kind != IACAV_ITEM
+      || !vattr || vattr->v_kind != IACAV_ITEM)
+    return vdef;
+  item = (IacaItem *) vitem;
+  attr = (IacaItem *) vattr;
+  tbl = item->v_attrtab;
+  if (!tbl)
+    return vdef;
+  ix = iaca_item_attribute_index_unsafe (tbl, attr);
+  if (ix < 0)
+    return vdef;
+  return tbl->at_entab[ix].en_val;
+}
+#define iaca_item_attribute_physical_get(Vitem,Vattr) \
+  iaca_item_attribute_physical_getdef((Vitem),(Vattr),(IacaValue*)0)
+
+/* in item vitem, get the first attribute */
+static inline IacaValue *
+iaca_item_first_attribute (IacaValue *vitem)
+{
+  IacaItem *item = 0;
+  unsigned sz = 0;
+  struct iacatabattr_st *tbl = 0;
+  if (!vitem || vitem->v_kind != IACAV_ITEM)
+    return NULL;
+  item = (IacaItem *) vitem;
+  tbl = item->v_attrtab;
+  if (!tbl)
+    return NULL;
+  sz = tbl->at_size;
+  for (unsigned ix = 0; ix < sz; ix++)
+    {
+      IacaItem *curit = tbl->at_entab[ix].en_item;
+      if (!curit || curit == IACA_EMPTY_SLOT)	/* emptied slot */
+	continue;
+      return (IacaValue *) curit;
+    }
+}
+
+/* in item vitem, get the attribute following a given attribute, or else null */
+static inline IacaValue *
+iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
+{
+  IacaItem *item = 0;
+  IacaItem *attr = 0;
+  struct iacatabattr_st *tbl = 0;
+  int ix = -1;
+  unsigned sz = 0;
+  if (!vitem || vitem->v_kind != IACAV_ITEM
+      || !vattr || vattr->v_kind != IACAV_ITEM)
+    return NULL;
+  item = (IacaItem *) vitem;
+  attr = (IacaItem *) vattr;
+  tbl = item->v_attrtab;
+  if (!tbl)
+    return NULL;
+  sz = tbl->at_size;
+  ix = iaca_item_attribute_index_unsafe (tbl, attr);
+  if (ix < 0)
+    return NULL;
+  for (ix = 0; ix < (int) sz; ix++)
+    {
+      IacaItem *curit = tbl->at_entab[ix].en_item;
+      if (!curit || curit == IACA_EMPTY_SLOT)	/* emptied slot */
+	continue;
+      return (IacaValue *) curit;
+    }
+}
 
 
 /** implementation of set membership **/
@@ -350,5 +498,6 @@ iaca_set_contains (IacaValue *vset, IacaValue *vitem)
     return false;
   return iaca_set_index_unsafe ((IacaSet *) vset, (IacaItem *) vitem) >= 0;
 }
+
 
 #endif /*IACA_INCLUDED */
