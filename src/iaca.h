@@ -88,7 +88,7 @@ typedef struct iacainteger_st IacaInteger;	/// boxed integer
 typedef struct iacastring_st IacaString;	/// boxed string
 typedef struct iacanode_st IacaNode;	/// node
 typedef struct iacaset_st IacaSet;	/// immutable set
-typedef struct iacaitem_st IacaItem;	/// item
+typedef struct iacaitem_st IacaItem;	/// shared mutable item with payload
 
 /// every value starts with a discriminating kind
 struct iacavalue_st
@@ -99,8 +99,8 @@ struct iacavalue_st
 /******************** BOXED INTEGERS *************/
 struct iacainteger_st
 {
-  unsigned v_kind;
-  long v_num;
+  unsigned v_kind;		/* always IACAV_INTEGER */
+  long v_num;			/* the immutable value */
 };
 
 // allocator
@@ -139,7 +139,7 @@ iacac_integer (IacaValue *v)
 /******************** STRING VALUES *************/
 struct iacastring_st
 {
-  unsigned v_kind;
+  unsigned v_kind;		/* always IACAV_STRING */
   // the array of valid UTF8 char; last is null
   gchar v_str[];
 };
@@ -174,10 +174,19 @@ iaca_string_valdef (IacaValue *v, const gchar * def)
 }
 
 // safe accessor or null string
-#define iaca_string_val(V) iaca_integer_valdef((V),NULL)
+#define iaca_string_val(V) iaca_string_valdef((V),NULL)
 
 // safe accessor or empty string
-#define iaca_string_valempty(V) iaca_integer_valdef((V),"")
+#define iaca_string_valempty(V) iaca_string_valdef((V),"")
+
+// safe cast to IacaString
+static inline IacaString *
+iacac_string (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_STRING)
+    return NULL;
+  return ((IacaString *) v);
+}
 
 
 /***************** NODE VALUES ****************/
@@ -185,10 +194,11 @@ iaca_string_valdef (IacaValue *v, const gchar * def)
 /* Nodes are immutable, and have a non-null connector item and sons */
 struct iacanode_st
 {
-  unsigned v_kind;
-  unsigned v_arity;		/* could even be a million, but much
-				   more is perhaps unreasonable */
-#define IACA_ARITY_MAX (1<<24)
+  unsigned v_kind;		/* always IACAV_KIND */
+  unsigned v_arity;		/* node arity, could even be a
+				   million, but much more is perhaps
+				   unreasonable */
+#define IACA_ARITY_MAX (1<<22)
   IacaItem *v_conn;
   IacaValue *v_sons[];		/* size is v_arity */
 };
@@ -200,7 +210,7 @@ extern IacaNode *iaca_node_make (IacaValue *conn, IacaValue *sontab[],
 // variadic allocator of a node with its sons, null terminated
 extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
   __attribute__ ((sentinel));
-#define ica_node_makevar(Conn,...) \
+#define iaca_node_makevar(Conn,...) \
   iaca_node_makevarf(Conn,##__VA_ARGS__,(IacaValue*)0)
 
 // safe accessors
@@ -239,5 +249,106 @@ iaca_node_sondef (IacaValue *v, int n, IacaValue *def)
 }
 
 #define iaca_node_son(V,N) iaca_node_sondef((V),(N),NULL)
+
+// safe cast to IacaNode
+static inline IacaNode *
+iacac_node (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_NODE)
+    return NULL;
+  return ((IacaNode *) v);
+}
+
+/***************** SET VALUES ****************/
+
+/* Sets are immutable, and have a dichotomical array of items, so
+   membership test is logarithmic */
+struct iacaset_st
+{
+  unsigned v_kind;		/* always IACAV_SET */
+  unsigned v_cardinal;		/* the cardinal of the set */
+#define IACA_CARDINAL_MAX (1<<24)
+  IacaItem *v_elements[];
+};
+
+// allocator of a set with a parent set and an  array of item elements.
+extern IacaNode *iaca_set_make (IacaValue *parentset, IacaValue *elemtab[],
+				unsigned arity);
+// variadic allocator of a set with its parent and elements, null terminated
+extern IacaNode *iaca_set_makevarf (IacaValue *parentset, ...)
+  __attribute__ ((sentinel));
+#define iaca_set_makevar(Par,...) \
+  iaca_node_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)
+#define iaca_set_makenewvar(...) \
+  iaca_node_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
+
+static inline int
+iaca_set_cardinaldef (IacaValue *v, int def)
+{
+  if (!v || v->v_kind != IACAV_SET)
+    return def;
+  return ((IacaSet *) v)->v_cardinal;
+}
+
+#define iaca_set_cardinal(V) iaca_set_cardinaldef((V),0)
+#define iaca_set_cardinalm1(V) iaca_set_cardinaldef((V),-1)
+
+/* membership test is logarithmic; implemented below! */
+static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
+
+/***************** SHARED ITEM VALUES ****************/
+struct iacaitem_st
+{
+  unsigned v_kind;		/* always IACAV_ITEM */
+  unsigned v_nbattr;		/* the number of attributes */
+  int64_t v_ident;		/* the unique identifying number */
+};
+
+
+/** implementation of set membership **/
+
+/* internal UNSAFE routine to get inside a set the index of an item,
+   or -1 iff not found. Don't call it, unless you are sure that set is
+   a set, item is an item! */
+static inline int
+iaca_set_index_unsafe (IacaSet *set, IacaItem *item)
+{
+
+  int lo = 0;
+  int hi = (int) (set->v_cardinal) - 1;
+  int md;
+  int64_t id = item->v_ident;
+  while (lo + 1 < hi)
+    {
+      IacaItem *curitem = 0;
+      md = (lo + hi) / 2;
+      curitem = set->v_elements[md];
+      if (curitem == item)
+	return md;
+      if (curitem->v_ident > id)
+	hi = md;
+      else if (curitem->v_ident < id)
+	lo = md;
+      else
+	g_assert (curitem == item);
+    };
+  for (md = lo; md <= hi; md++)
+    {
+      IacaItem *curitem = set->v_elements[md];
+      if (curitem == item)
+	return md;
+    }
+  return -1;
+}
+
+static inline bool
+iaca_set_contains (IacaValue *vset, IacaValue *vitem)
+{
+  if (!vset || vset->v_kind != IACAV_SET)
+    return false;
+  if (!vitem || vitem->v_kind != IACAV_ITEM)
+    return false;
+  return iaca_set_index_unsafe ((IacaSet *) vset, (IacaItem *) vitem) >= 0;
+}
 
 #endif /*IACA_INCLUDED */
