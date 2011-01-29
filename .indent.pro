@@ -1,0 +1,8 @@
+-gnu
+-T IacaValue
+-T IacaInteger
+-T IacaString
+-T IacaNode
+-T IacaSet
+-T IacaItem
+-T GtkWidget
