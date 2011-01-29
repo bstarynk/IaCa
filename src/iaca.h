@@ -296,6 +296,12 @@ iaca_set_cardinaldef (IacaValue *v, int def)
 /* membership test is logarithmic; implemented below! */
 static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
 
+/* given a set return its first element or null */
+static inline IacaValue *iaca_set_first_element (IacaValue *vset);
+/* given a set return the lowest element after a given one or null */
+static inline IacaValue *iaca_set_after_element (IacaValue *vset,
+						 IacaValue *velem);
+
 /***************** SHARED ITEM VALUES ****************/
 
 /* item payload */
@@ -396,6 +402,7 @@ iaca_item_attribute_physical_getdef (IacaValue *vitem, IacaValue *vattr,
     return vdef;
   return tbl->at_entab[ix].en_val;
 }
+
 #define iaca_item_attribute_physical_get(Vitem,Vattr) \
   iaca_item_attribute_physical_getdef((Vitem),(Vattr),(IacaValue*)0)
 
@@ -499,5 +506,52 @@ iaca_set_contains (IacaValue *vset, IacaValue *vitem)
   return iaca_set_index_unsafe ((IacaSet *) vset, (IacaItem *) vitem) >= 0;
 }
 
+
+static inline IacaValue *
+iaca_set_first_element (IacaValue *vset)
+{
+  IacaSet *set = 0;
+  if (!vset || vset->v_kind != IACAV_SET)
+    return NULL;
+  set = (IacaSet *) vset;
+  if (set->v_cardinal > 0)
+    return (IacaValue *) set->v_elements[0];
+  return NULL;
+}
+
+static inline IacaValue *
+iaca_set_after_element (IacaValue *vset, IacaValue *velem)
+{
+  int lo = 0, hi = 0, md = 0, last = 0;
+  int64_t id = 0;
+  IacaSet *set = 0;
+  IacaItem *item = 0;
+  if (!vset || vset->v_kind != IACAV_SET)
+    return NULL;
+  if (!velem || velem->v_kind != IACAV_ITEM)
+    return NULL;
+  set = (IacaSet *) vset;
+  item = (IacaItem *) velem;
+  id = item->v_ident;
+  lo = 0;
+  last = hi = (int) (set->v_cardinal) - 1;
+  while (lo + 1 < hi)
+    {
+      IacaItem *curitem = 0;
+      md = (lo + hi) / 2;
+      curitem = set->v_elements[md];
+      if (curitem->v_ident > id)
+	hi = md;
+      else if (curitem->v_ident < id)
+	lo = md;
+    };
+  for (md = lo; md <= hi; md++)
+    {
+      IacaItem *curitem = set->v_elements[md];
+      if (curitem->v_ident > id)
+	return (IacaValue *) curitem;
+    }
+  return NULL;
+}
 
 #endif /*IACA_INCLUDED */
