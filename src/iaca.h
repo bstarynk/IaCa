@@ -114,13 +114,13 @@ struct iacastring_st
 };
 
 // allocator of a string; return null if invalid
-static inline IacaString *iaca_string_make (const gchar * s);
+static inline IacaString *iaca_string_make (const gchar *s);
 
 #define iacav_string_make(L) ((IacaString*)iaca_integer_make((L)))
 
 // safe accessor with default
 static inline const gchar *iaca_string_val_def (IacaValue *v,
-						const gchar * def);
+						const gchar *def);
 
 // safe accessor or null string
 #define iaca_string_val(V) iaca_string_val_def((V),NULL)
@@ -370,7 +370,7 @@ iacac_integer (IacaValue *v)
 
 // allocator of a string; return null if invalid
 static inline IacaString *
-iaca_string_make (const gchar * s)
+iaca_string_make (const gchar *s)
 {
   const gchar *ends = 0;
   // accept null pointer, and ensure argument is valid UTF8
@@ -388,7 +388,7 @@ iaca_string_make (const gchar * s)
 
 // safe accessor with default
 static inline const gchar *
-iaca_string_val_def (IacaValue *v, const gchar * def)
+iaca_string_val_def (IacaValue *v, const gchar *def)
 {
   if (!v || v->v_kind != IACAV_STRING)
     return def;

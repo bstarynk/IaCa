@@ -217,10 +217,7 @@ iaca_item_attribute_reorganize (IacaValue *vitem, unsigned xtra)
       g_assert (pos >= 0);
     }
   g_assert (tbl->at_count == newtbl->at_count);
-  /* we are sure the old tbl is not reachable and can be cleared and freed */
-  memset (tbl, 0,
-	  sizeof (struct iacatabattr_st) +
-	  sz * sizeof (struct iacaentryattr_st));
+  /* we are sure the old tbl is not reachable and can be freed */
   GC_FREE (tbl);
 }
 
@@ -292,8 +289,35 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
   return oldval;
 }
 
+#define IACA_MANIFEST_FILE "IaCa_Manifest"
+
+struct iacaloader_st
+{
+  GHashTable *ld_htab;
+};
+
+void
+iaca_load (const char *dirpath)
+{
+  gchar *manipath = 0;
+  struct iacaloader_st ld = { 0 };
+  if (!dirpath || !dirpath[0])
+    dirpath = ".";
+  manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
+  memset (&ld, 0, sizeof (ld));
+  ld.ld_htab = g_hash_table_new (g_int64_hash, g_int64_equal);
+}
+
+void
+iaca_dump (const char *dirpath)
+{
+  if (!dirpath || !dirpath[0])
+    dirpath = ".";
+}
+
 int
 main (int argc, char **argv)
 {
   GC_INIT ();
+  gtk_init (&argc, &argv);
 }

@@ -5,4 +5,5 @@
 -T IacaNode
 -T IacaSet
 -T IacaItem
+-T gchar
 -T GtkWidget
