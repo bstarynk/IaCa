@@ -65,7 +65,6 @@ iaca_node_makevarf (IacaValue *conn, ...)
 }
 
 
-static int64_t iaca_item_last_ident;
 
 IacaItem *
 iaca_item_make (void)
@@ -287,83 +286,6 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
   if (tbl->at_size > 10 && tbl->at_count < tbl->at_size / 5)
     iaca_item_attribute_reorganize (vitem, 0);
   return oldval;
-}
-
-#define IACA_MANIFEST_FILE "IaCa_Manifest"
-
-struct iacaloader_st
-{
-  /* hash table asociating item identifiers to loaded item, actually
-     the key is a IacaItem structure ... */
-  GHashTable *ld_itemhtab;
-};
-
-/* a Glib GHashTable compatible hash function on items */
-guint
-iaca_item_ghash (gconstpointer p)
-{
-  const IacaItem *itm = (const IacaItem *) p;
-  if (!itm)
-    return 0;
-  return itm->v_ident % 1073741939;	/* a prime number near 1 << 30 */
-}
-
-gboolean
-iaca_item_gheq (gconstpointer p1, gconstpointer p2)
-{
-  const IacaItem *itm1 = (const IacaItem *) p1;
-  const IacaItem *itm2 = (const IacaItem *) p1;
-  if (itm1 == itm2)
-    return TRUE;
-  if (!itm1 || !itm2)
-    return FALSE;
-  return itm1->v_ident == itm2->v_ident;
-}
-
-
-/* retrieve or create a loaded item of given id */
-static inline IacaItem *
-iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
-{
-  IacaItem *itm = 0;
-  struct iacaitem_st itmst = { 0 };
-  if (id <= 0 || !ld || !ld->ld_itemhtab)
-    return NULL;
-  itmst.v_ident = id;
-  itm = g_hash_table_lookup (ld->ld_itemhtab, &itmst);
-  if (itm)
-    return itm;
-  itm = iaca_alloc_data (sizeof (IacaItem));
-  itm->v_kind = IACAV_ITEM;
-  itm->v_ident = id;
-  if (iaca_item_last_ident < id)
-    iaca_item_last_ident = id;
-  itm->v_attrtab = NULL;
-  itm->v_payloadkind = IACAPAYLOAD__NONE;
-  itm->v_payloadptr = NULL;
-  itm->v_itemcontent = NULL;
-  g_hash_table_insert (ld->ld_itemhtab, itm, itm);
-  return itm;
-}
-
-
-void
-iaca_load (const char *dirpath)
-{
-  gchar *manipath = 0;
-  struct iacaloader_st ld = { 0 };
-  if (!dirpath || !dirpath[0])
-    dirpath = ".";
-  manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
-  memset (&ld, 0, sizeof (ld));
-  ld.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
-}
-
-void
-iaca_dump (const char *dirpath)
-{
-  if (!dirpath || !dirpath[0])
-    dirpath = ".";
 }
 
 int

@@ -244,6 +244,8 @@ struct iacaitem_st
   };
 };
 
+int64_t iaca_item_last_ident;
+
 /* make an item */
 extern IacaItem *iaca_item_make (void);
 #define iacav_item_make() ((IacaValue*) iaca_item_make())
@@ -652,5 +654,7 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
     }
   return NULL;
 }
+
+#define IACA_MANIFEST_FILE "IaCa_Manifest"
 
 #endif /*IACA_INCLUDED */
