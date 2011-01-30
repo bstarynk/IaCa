@@ -323,14 +323,20 @@ struct iacaitem_st
   IacaValue *v_itemcontent;	/* the mutable item content */
   struct iacaspace_st *v_space;	/* the item space defines where it is
 				   persisted */
-  /* anonymous union of pointers for payload */
+  /* anonymous union of pointers for payload. Change simultanously the
+     v_payloadkind. */
   union
   {
-    void *v_payptr;
-    struct iacavectorpayload_st *v_payvect;
-    struct iacadictionnary_st *v_paydict;
+    void *v_payloadptr;
+    struct iacapayloadvector_st *v_payloadvect;
+    struct iacapayloaddictionnary_st *v_payloaddict;
   };
 };
+
+/* make an item */
+extern IacaItem *iaca_item_make (void);
+/* physically put an attribute inside an item */
+extern void iaca_item_put (IacaValue *item, IacaValue *attr, IacaValue *val);
 
 struct iacaentryattr_st
 {
@@ -427,6 +433,7 @@ iaca_item_first_attribute (IacaValue *vitem)
 	continue;
       return (IacaValue *) curit;
     }
+  return NULL;
 }
 
 /* in item vitem, get the attribute following a given attribute, or else null */
@@ -450,7 +457,7 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
   ix = iaca_item_attribute_index_unsafe (tbl, attr);
   if (ix < 0)
     return NULL;
-  for (ix = 0; ix < (int) sz; ix++)
+  for (ix = ix; ix < (int) sz; ix++)
     {
       IacaItem *curit = tbl->at_entab[ix].en_item;
       if (!curit || curit == IACA_EMPTY_SLOT)	/* emptied slot */

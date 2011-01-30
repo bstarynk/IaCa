@@ -64,6 +64,24 @@ iaca_node_makevarf (IacaValue *conn, ...)
   return n;
 }
 
+
+static int64_t iaca_item_last_ident;
+
+IacaItem *
+iaca_item_make (void)
+{
+  IacaItem *it = 0;
+  iaca_item_last_ident++;
+  it = iaca_alloc_data (sizeof (IacaItem));
+  it->v_kind = IACAV_ITEM;
+  it->v_ident = iaca_item_last_ident;
+  it->v_attrtab = NULL;
+  it->v_payloadkind = IACAPAYLOAD__NONE;
+  it->v_payloadptr = NULL;
+  it->v_itemcontent = NULL;
+  return it;
+}
+
 int
 main (int argc, char **argv)
 {
