@@ -51,24 +51,12 @@
 // allocate a garbage collected data and clear it. The data might
 // later contain pointers and other things to be followed by the
 // garbage collector.
-static inline void *
-iaca_alloc_data (size_t sz)
-{
-  void *v = GC_MALLOC (sz);
-  memset (v, 0, sz);
-  return v;
-}
+static inline void *iaca_alloc_data (size_t sz);
 
 // for optimization, allocate a garbage collected data and clear
 // it. However, we promise that the data will never contain any
 // pointer. Boehm's garbage collector will handle it more efficiently.
-static inline void *
-iaca_alloc_atomic (size_t sz)
-{
-  void *v = GC_MALLOC_ATOMIC (sz);
-  memset (v, 0, sz);
-  return v;
-}
+static inline void *iaca_alloc_atomic (size_t sz);
 
 // our value kinds
 enum iacavaluekind_en
@@ -104,37 +92,18 @@ struct iacainteger_st
 };
 
 // allocator
-static inline IacaInteger *
-iaca_integer_make (long l)
-{
-  IacaInteger *v = iaca_alloc_atomic (sizeof (IacaInteger));
-  v->v_kind = IACAV_INTEGER;
-  v->v_num = l;
-  return v;
-}
+static inline IacaInteger *iaca_integer_make (long l);
 
 #define iacav_integer_make(L) ((IacaValue*)iaca_integer_make((L)))
 
 // safe accessor with default
-static inline long
-iaca_integer_valdef (IacaValue *v, long def)
-{
-  if (!v || v->v_kind != IACAV_INTEGER)
-    return def;
-  return ((IacaInteger *) v)->v_num;
-}
+static inline long iaca_integer_val_def (IacaValue *v, long def);
 
 // safe accessor or 0
-#define iaca_integer_val(V) iaca_integer_valdef((V),0L)
+#define iaca_integer_val(V) iaca_integer_val_def((V),0L)
 
 // safe casting to IacaInteger
-static inline IacaInteger *
-iacac_integer (IacaValue *v)
-{
-  if (!v || v->v_kind != IACAV_INTEGER)
-    return NULL;
-  return ((IacaInteger *) v);
-}
+static inline IacaInteger *iacac_integer (IacaValue *v);
 
 /******************** STRING VALUES *************/
 struct iacastring_st
@@ -145,48 +114,22 @@ struct iacastring_st
 };
 
 // allocator of a string; return null if invalid
-static inline IacaString *
-iaca_string_make (const gchar * s)
-{
-  const gchar *ends = 0;
-  // accept null pointer, and ensure argument is valid UTF8
-  if (!s)
-    s = "";
-  if (!g_utf8_validate (s, (gssize) - 1, &ends))
-    return 0;
-  gsize sz = ends - s;
-  IacaString *v =
-    iaca_alloc_atomic (sizeof (IacaInteger) + (sz + 1) * sizeof (gchar));
-  v->v_kind = IACAV_STRING;
-  memcpy (v->v_str, s, sz);
-  return v;
-}
+static inline IacaString *iaca_string_make (const gchar * s);
 
 #define iacav_string_make(L) ((IacaString*)iaca_integer_make((L)))
 
 // safe accessor with default
-static inline const gchar *
-iaca_string_valdef (IacaValue *v, const gchar * def)
-{
-  if (!v || v->v_kind != IACAV_STRING)
-    return def;
-  return ((IacaString *) v)->v_str;
-}
+static inline const gchar *iaca_string_val_def (IacaValue *v,
+						const gchar * def);
 
 // safe accessor or null string
-#define iaca_string_val(V) iaca_string_valdef((V),NULL)
+#define iaca_string_val(V) iaca_string_val_def((V),NULL)
 
 // safe accessor or empty string
-#define iaca_string_valempty(V) iaca_string_valdef((V),"")
+#define iaca_string_valempty(V) iaca_string_val_def((V),"")
 
 // safe cast to IacaString
-static inline IacaString *
-iacac_string (IacaValue *v)
-{
-  if (!v || v->v_kind != IACAV_STRING)
-    return NULL;
-  return ((IacaString *) v);
-}
+static inline IacaString *iacac_string (IacaValue *v);
 
 
 /***************** NODE VALUES ****************/
@@ -215,49 +158,23 @@ extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
 
 // safe accessors
 // get the connective or a default
-static inline IacaValue *
-iaca_node_conndef (IacaValue *v, IacaValue *def)
-{
-  if (!v || v->v_kind != IACAV_NODE)
-    return def;
-  return (IacaValue *) (((IacaNode *) v)->v_conn);
-}
+static inline IacaValue *iaca_node_conn_def (IacaValue *v, IacaValue *def);
+#define iaca_node_conn(V) iaca_node_conn_def(v,(IacaValue*)0)
 
-#define iaca_node_conn(V) iaca_node_conndef(v,(IacaValue*)0)
 // get the arity or a default; gives a signed integer
-static inline int
-iaca_node_aritydef (IacaValue *v, int def)
-{
-  if (!v || v->v_kind != IACAV_NODE)
-    return def;
-  return ((IacaNode *) v)->v_arity;
-}
+static inline int iaca_node_arity_def (IacaValue *v, int def);
 
-#define iaca_node_arity(V) iaca_node_aritydef((V),0)
-#define iaca_node_aritym1(V) iaca_node_aritydef((V),-1)
+#define iaca_node_arity(V) iaca_node_arity_def((V),0)
+#define iaca_node_aritym1(V) iaca_node_arity_def((V),-1)
+
 // get the n-th son or a default. If n is negative, count from end.
-static inline IacaValue *
-iaca_node_sondef (IacaValue *v, int n, IacaValue *def)
-{
-  if (!v || v->v_kind != IACAV_NODE)
-    return def;
-  if (n < 0)
-    n += ((IacaNode *) v)->v_arity;
-  if (n >= 0 && n < ((IacaNode *) v)->v_arity)
-    return ((IacaNode *) v)->v_sons[n];
-  return def;
-}
+static inline IacaValue *iaca_node_son_def (IacaValue *v, int n,
+					    IacaValue *def);
 
-#define iaca_node_son(V,N) iaca_node_sondef((V),(N),NULL)
+#define iaca_node_son(V,N) iaca_node_son_def((V),(N),NULL)
 
 // safe cast to IacaNode
-static inline IacaNode *
-iacac_node (IacaValue *v)
-{
-  if (!v || v->v_kind != IACAV_NODE)
-    return NULL;
-  return ((IacaNode *) v);
-}
+static inline IacaNode *iacac_node (IacaValue *v);
 
 /***************** SET VALUES ****************/
 
@@ -282,16 +199,10 @@ extern IacaNode *iaca_set_makevarf (IacaValue *parentset, ...)
 #define iaca_set_makenewvar(...) \
   iaca_node_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
 
-static inline int
-iaca_set_cardinaldef (IacaValue *v, int def)
-{
-  if (!v || v->v_kind != IACAV_SET)
-    return def;
-  return ((IacaSet *) v)->v_cardinal;
-}
+static inline int iaca_set_cardinal_def (IacaValue *v, int def);
 
-#define iaca_set_cardinal(V) iaca_set_cardinaldef((V),0)
-#define iaca_set_cardinalm1(V) iaca_set_cardinaldef((V),-1)
+#define iaca_set_cardinal(V) iaca_set_cardinal_def((V),0)
+#define iaca_set_cardinalm1(V) iaca_set_cardinal_def((V),-1)
 
 /* membership test is logarithmic; implemented below! */
 static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
@@ -335,8 +246,7 @@ struct iacaitem_st
 
 /* make an item */
 extern IacaItem *iaca_item_make (void);
-/* physically put an attribute inside an item */
-extern void iaca_item_put (IacaValue *item, IacaValue *attr, IacaValue *val);
+#define iacav_item_make() ((IacaValue*) iaca_item_make())
 
 struct iacaentryattr_st
 {
@@ -352,13 +262,202 @@ struct iacatabattr_st
   struct iacaentryattr_st at_entab[];	/* size is at_size */
 };
 
-/** implementation of item physical attribute getting **/
+/* in item vitem, physically get the value associate to attribute
+   vattr or else default vdef */
+static inline IacaValue *iaca_item_attribute_physical_get_def (IacaValue
+							       *vitem,
+							       IacaValue
+							       *vattr,
+							       IacaValue
+							       *vdef);
+
+#define iaca_item_attribute_physical_get(Vitem,Vattr) \
+  iaca_item_attribute_physical_get_def((Vitem),(Vattr),(IacaValue*)0)
+
+/* inside an item vitem put attribute vattr associated to value
+   val. Don't do anything if vitem or vattr are not items, or if val
+   is null. May grow the table if it was full. */
+extern void iaca_item_physical_put (IacaValue *vitem, IacaValue *vattr,
+				    IacaValue *val);
+
+/* inside an item vitem remove attribute vattr and return its previous
+   value. Don't do anything if vitem or vattr are not items. May
+   shrink the table if it was nearly empty. */
+extern IacaValue *iaca_item_physical_remove (IacaValue *vitem,
+					     IacaValue *vattr);
+
+/* Reorganize an item attribute table and reserve space for xtra
+   attributes, perhaps shrinking or growing the table. */
+extern void iaca_item_attribute_reorganize (IacaValue *vitem, unsigned xtra);
+
+/* in item vitem, get the first attribute */
+static inline IacaValue *iaca_item_first_attribute (IacaValue *vitem);
+
+/* in item vitem, get the attribute following a given attribute, or else null */
+static inline IacaValue *iaca_item_next_attribute (IacaValue *vitem,
+						   IacaValue *vattr);
+
+/* iterate inside an item attribute; Item and Attr should be local
+   variables; Item should not be modified inside the for body. */
+#define IACA_FOREACH_ITEM_ATTRIBUTE(Item,Attr)		\
+  for(Attr=iaca_item_first_attribute ((Item));		\
+      (Attr) != NULL;					\
+      Attr = iaca_item_next_attribute((Item),(Attr)))
+
+static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
+
+static inline IacaValue *iaca_set_first_element (IacaValue *vset);
+
+static inline IacaValue *iaca_set_after_element (IacaValue *vset,
+						 IacaValue *velem);
+
+/* iterate inside a set; Set and Elem should be local variables. Set
+   should not be modified inside the for body. */
+#define IACA_FOREACH_SET_ELEMENT(Set,Elem)		\
+  for (Elem=iaca_set_first_element((Set));		\
+       (Elem) != NULL;					\
+       Elem = iaca_set_after_element((Set),(Elem)))
+
+
+
+
+/*****************************************************************************
+ *****************************************************************************
+ *****************************************************************************/
+
+static inline void *
+iaca_alloc_data (size_t sz)
+{
+  void *v = GC_MALLOC (sz);
+  memset (v, 0, sz);
+  return v;
+}
+
+static inline void *
+iaca_alloc_atomic (size_t sz)
+{
+  void *v = GC_MALLOC_ATOMIC (sz);
+  memset (v, 0, sz);
+  return v;
+}
+
+static inline IacaInteger *
+iaca_integer_make (long l)
+{
+  IacaInteger *v = iaca_alloc_atomic (sizeof (IacaInteger));
+  v->v_kind = IACAV_INTEGER;
+  v->v_num = l;
+  return v;
+}
+
+// safe accessor with default
+static inline long
+iaca_integer_val_def (IacaValue *v, long def)
+{
+  if (!v || v->v_kind != IACAV_INTEGER)
+    return def;
+  return ((IacaInteger *) v)->v_num;
+}
+
+// safe casting to IacaInteger
+static inline IacaInteger *
+iacac_integer (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_INTEGER)
+    return NULL;
+  return ((IacaInteger *) v);
+}
+
+// allocator of a string; return null if invalid
+static inline IacaString *
+iaca_string_make (const gchar * s)
+{
+  const gchar *ends = 0;
+  // accept null pointer, and ensure argument is valid UTF8
+  if (!s)
+    s = "";
+  if (!g_utf8_validate (s, (gssize) - 1, &ends))
+    return 0;
+  gsize sz = ends - s;
+  IacaString *v =
+    iaca_alloc_atomic (sizeof (IacaInteger) + (sz + 1) * sizeof (gchar));
+  v->v_kind = IACAV_STRING;
+  memcpy (v->v_str, s, sz);
+  return v;
+}
+
+// safe accessor with default
+static inline const gchar *
+iaca_string_val_def (IacaValue *v, const gchar * def)
+{
+  if (!v || v->v_kind != IACAV_STRING)
+    return def;
+  return ((IacaString *) v)->v_str;
+}
+
+// safe cast to IacaString
+static inline IacaString *
+iacac_string (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_STRING)
+    return NULL;
+  return ((IacaString *) v);
+}
+
+// safe accessors
+// get the connective or a default
+static inline IacaValue *
+iaca_node_conn_def (IacaValue *v, IacaValue *def)
+{
+  if (!v || v->v_kind != IACAV_NODE)
+    return def;
+  return (IacaValue *) (((IacaNode *) v)->v_conn);
+}
+
+// get the arity or a default; gives a signed integer
+static inline int
+iaca_node_arity_def (IacaValue *v, int def)
+{
+  if (!v || v->v_kind != IACAV_NODE)
+    return def;
+  return ((IacaNode *) v)->v_arity;
+}
+
+// get the n-th son or a default. If n is negative, count from end.
+static inline IacaValue *
+iaca_node_son_def (IacaValue *v, int n, IacaValue *def)
+{
+  if (!v || v->v_kind != IACAV_NODE)
+    return def;
+  if (n < 0)
+    n += ((IacaNode *) v)->v_arity;
+  if (n >= 0 && n < ((IacaNode *) v)->v_arity)
+    return ((IacaNode *) v)->v_sons[n];
+  return def;
+}
+
+// safe cast to IacaNode
+static inline IacaNode *
+iacac_node (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_NODE)
+    return NULL;
+  return ((IacaNode *) v);
+}
+
+static inline int
+iaca_set_cardinal_def (IacaValue *v, int def)
+{
+  if (!v || v->v_kind != IACAV_SET)
+    return def;
+  return ((IacaSet *) v)->v_cardinal;
+}
 
 /* internal UNSAFE routine returning the index of an attribute inside
    a table, or else -1. Don't call it unless you are sure that tbl is
    a non-null table, and itat is an item! */
 static inline int
-iaca_item_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
+iaca_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
 {
   unsigned sz = tbl->at_size;
   unsigned h = itat->v_ident % sz;
@@ -385,11 +484,9 @@ iaca_item_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
   return -1;
 }
 
-/* in item vitem, physically get the value associate to attribute
-   vattr or else default vdef */
 static inline IacaValue *
-iaca_item_attribute_physical_getdef (IacaValue *vitem, IacaValue *vattr,
-				     IacaValue *vdef)
+iaca_item_attribute_physical_get_def (IacaValue *vitem, IacaValue *vattr,
+				      IacaValue *vdef)
 {
   IacaItem *item = 0;
   IacaItem *attr = 0;
@@ -403,14 +500,11 @@ iaca_item_attribute_physical_getdef (IacaValue *vitem, IacaValue *vattr,
   tbl = item->v_attrtab;
   if (!tbl)
     return vdef;
-  ix = iaca_item_attribute_index_unsafe (tbl, attr);
+  ix = iaca_attribute_index_unsafe (tbl, attr);
   if (ix < 0)
     return vdef;
   return tbl->at_entab[ix].en_val;
 }
-
-#define iaca_item_attribute_physical_get(Vitem,Vattr) \
-  iaca_item_attribute_physical_getdef((Vitem),(Vattr),(IacaValue*)0)
 
 /* in item vitem, get the first attribute */
 static inline IacaValue *
@@ -436,6 +530,7 @@ iaca_item_first_attribute (IacaValue *vitem)
   return NULL;
 }
 
+
 /* in item vitem, get the attribute following a given attribute, or else null */
 static inline IacaValue *
 iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
@@ -454,7 +549,7 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
   if (!tbl)
     return NULL;
   sz = tbl->at_size;
-  ix = iaca_item_attribute_index_unsafe (tbl, attr);
+  ix = iaca_attribute_index_unsafe (tbl, attr);
   if (ix < 0)
     return NULL;
   for (ix = ix; ix < (int) sz; ix++)
@@ -466,8 +561,6 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
     }
 }
 
-
-/** implementation of set membership **/
 
 /* internal UNSAFE routine to get inside a set the index of an item,
    or -1 iff not found. Don't call it, unless you are sure that set is
@@ -512,7 +605,6 @@ iaca_set_contains (IacaValue *vset, IacaValue *vitem)
     return false;
   return iaca_set_index_unsafe ((IacaSet *) vset, (IacaItem *) vitem) >= 0;
 }
-
 
 static inline IacaValue *
 iaca_set_first_element (IacaValue *vset)
