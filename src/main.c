@@ -70,16 +70,16 @@ static int64_t iaca_item_last_ident;
 IacaItem *
 iaca_item_make (void)
 {
-  IacaItem *it = 0;
+  IacaItem *itm = 0;
   iaca_item_last_ident++;
-  it = iaca_alloc_data (sizeof (IacaItem));
-  it->v_kind = IACAV_ITEM;
-  it->v_ident = iaca_item_last_ident;
-  it->v_attrtab = NULL;
-  it->v_payloadkind = IACAPAYLOAD__NONE;
-  it->v_payloadptr = NULL;
-  it->v_itemcontent = NULL;
-  return it;
+  itm = iaca_alloc_data (sizeof (IacaItem));
+  itm->v_kind = IACAV_ITEM;
+  itm->v_ident = iaca_item_last_ident;
+  itm->v_attrtab = NULL;
+  itm->v_payloadkind = IACAPAYLOAD__NONE;
+  itm->v_payloadptr = NULL;
+  itm->v_itemcontent = NULL;
+  return itm;
 }
 
 
@@ -293,8 +293,59 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 
 struct iacaloader_st
 {
-  GHashTable *ld_htab;
+  /* hash table asociating item identifiers to loaded item, actually
+     the key is a IacaItem structure ... */
+  GHashTable *ld_itemhtab;
 };
+
+/* a Glib GHashTable compatible hash function on items */
+guint
+iaca_item_ghash (gconstpointer p)
+{
+  const IacaItem *itm = (const IacaItem *) p;
+  if (!itm)
+    return 0;
+  return itm->v_ident % 1073741939;	/* a prime number near 1 << 30 */
+}
+
+gboolean
+iaca_item_gheq (gconstpointer p1, gconstpointer p2)
+{
+  const IacaItem *itm1 = (const IacaItem *) p1;
+  const IacaItem *itm2 = (const IacaItem *) p1;
+  if (itm1 == itm2)
+    return TRUE;
+  if (!itm1 || !itm2)
+    return FALSE;
+  return itm1->v_ident == itm2->v_ident;
+}
+
+
+/* retrieve or create a loaded item of given id */
+static inline IacaItem *
+iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
+{
+  IacaItem *itm = 0;
+  struct iacaitem_st itmst = { 0 };
+  if (id <= 0 || !ld || !ld->ld_itemhtab)
+    return NULL;
+  itmst.v_ident = id;
+  itm = g_hash_table_lookup (ld->ld_itemhtab, &itmst);
+  if (itm)
+    return itm;
+  itm = iaca_alloc_data (sizeof (IacaItem));
+  itm->v_kind = IACAV_ITEM;
+  itm->v_ident = id;
+  if (iaca_item_last_ident < id)
+    iaca_item_last_ident = id;
+  itm->v_attrtab = NULL;
+  itm->v_payloadkind = IACAPAYLOAD__NONE;
+  itm->v_payloadptr = NULL;
+  itm->v_itemcontent = NULL;
+  g_hash_table_insert (ld->ld_itemhtab, itm, itm);
+  return itm;
+}
+
 
 void
 iaca_load (const char *dirpath)
@@ -305,7 +356,7 @@ iaca_load (const char *dirpath)
     dirpath = ".";
   manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
   memset (&ld, 0, sizeof (ld));
-  ld.ld_htab = g_hash_table_new (g_int64_hash, g_int64_equal);
+  ld.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
 }
 
 void
