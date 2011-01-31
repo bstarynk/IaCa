@@ -21,11 +21,33 @@
 #include "iaca.h"
 
 
+/* the JSON loader has a stack of values and a stack of states. Each state is */
+enum iacajsonstate_en
+{
+  IACAJS__NONE,
+  IACAJS_FRESHVAL,		/* parsing a fresh IacaValue */
+};
+
+struct iacajsonstate_st
+{
+  enum iacajsonstate_en js_state;
+  union
+  {
+    long js_num;
+  };
+};
+
 struct iacaloader_st
 {
-  /* hash table asociating item identifiers to loaded item, actually
+  /* Glib hash table asociating item identifiers to loaded item, actually
      the key is a IacaItem structure ... */
   GHashTable *ld_itemhtab;
+  /* the handle to the YAJL JSON parser. See git://github.com/lloyd/yajl */
+  yajl_handle ld_json;
+  /* Glib array, stack of IacaValue* pointers */
+  GPtrArray *ld_valstack;
+  /* Glib array, stack of struct iacajsonstate_st */
+  GArray *ld_statestack;
 };
 
 /* a Glib GHashTable compatible hash function on items */
@@ -76,6 +98,83 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   return itm;
 }
 
+static inline struct iacajsonstate_st *
+iaca_json_top_state (struct iacaloader_st *ld)
+{
+  int ln = 0;
+  GArray *sta = 0;
+  if (!ld)
+    return NULL;
+  sta = ld->ld_statestack;
+  if (!sta)
+    return NULL;
+  ln = sta->len;
+  if (ln <= 0)
+    return NULL;
+  return &g_array_index (sta, struct iacajsonstate_st, ln - 1);
+}
+
+static inline IacaValue *
+iaca_json_top_value (struct iacaloader_st *ld)
+{
+  int ln = 0;
+  GPtrArray *sta = 0;
+  if (!ld)
+    return NULL;
+  sta = ld->ld_valstack;
+  if (!sta)
+    return NULL;
+  ln = sta->len;
+  if (ln <= 0)
+    return NULL;
+  return (IacaValue *) g_ptr_array_index (sta, ln - 1);
+}
+
+static inline void
+iaca_json_value_push (struct iacaloader_st *ld, IacaValue *va)
+{
+  int ln = 0;
+  GPtrArray *sta = 0;
+  if (!ld)
+    return;
+  sta = ld->ld_valstack;
+  if (!sta)
+    return;
+  g_ptr_array_add (sta, va);
+}
+
+static inline void
+iaca_json_value_pop (struct iacaloader_st *ld)
+{
+  int ln = 0;
+  GPtrArray *sta = 0;
+  if (!ld)
+    return;
+  sta = ld->ld_valstack;
+  if (!sta)
+    return;
+  ln = sta->len;
+  if (ln <= 0)
+    return;
+  g_ptr_array_remove_index (sta, ln - 1);
+}
+
+static inline void
+iaca_json_state_pop (struct iacaloader_st *ld)
+{
+  int ln = 0;
+  GArray *sta = 0;
+  if (!ld)
+    return;
+  sta = ld->ld_statestack;
+  if (!sta)
+    return;
+  ln = sta->len;
+  if (ln <= 0)
+    return;
+  g_array_remove_index (sta, ln - 1);
+}
+
 /* various YAJL handlers for loading JSON */
 
 #warning unimplemented YAJL handlers return 0
@@ -83,6 +182,15 @@ static int
 iacaloadyajl_null (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  if (topst->js_state == IACAJS_FRESHVAL)
+    {
+      iaca_json_state_pop (ld);
+      iaca_json_value_push (ld, NULL);
+      return 1;
+    }
   return 0;
 }
 

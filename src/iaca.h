@@ -85,6 +85,9 @@ struct iacavalue_st
 };
 
 /******************** BOXED INTEGERS *************/
+/*** JSON:
+     { "kd" : "int" , "int" : <number> } 
+***/
 struct iacainteger_st
 {
   unsigned v_kind;		/* always IACAV_INTEGER */
@@ -106,6 +109,10 @@ static inline long iaca_integer_val_def (IacaValue *v, long def);
 static inline IacaInteger *iacac_integer (IacaValue *v);
 
 /******************** STRING VALUES *************/
+/*** JSON:
+     { "kd" : "str" , "str" : <string> } 
+***/
+
 struct iacastring_st
 {
   unsigned v_kind;		/* always IACAV_STRING */
@@ -133,6 +140,9 @@ static inline IacaString *iacac_string (IacaValue *v);
 
 
 /***************** NODE VALUES ****************/
+/*** JSON:
+     { "kd" : "node" , "con" : <int-id> , "sons" : [ <son-values...> ] } 
+***/
 
 /* Nodes are immutable, and have a non-null connector item and sons */
 struct iacanode_st
@@ -177,6 +187,10 @@ static inline IacaValue *iaca_node_son_def (IacaValue *v, int n,
 static inline IacaNode *iacac_node (IacaValue *v);
 
 /***************** SET VALUES ****************/
+/*** JSON:
+     { "kd" : "set" ,  "elem" : [ <element-ids...> ] } 
+***/
+
 
 /* Sets are immutable, and have a dichotomical array of items, so
    membership test is logarithmic */
@@ -214,7 +228,25 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 						 IacaValue *velem);
 
 /***************** SHARED ITEM VALUES ****************/
+/****
+  JSON representation. We serialize separately item shared references
+  (= pointers to IacaItem) and item contents (=the data inside a
+  IacaItem). 
+  Item references are serialized as
+  { "kd" : "itr" ,  "id" : <id-number> } 
 
+  Item contents are serialized like
+  { "item" : <id-number> ,
+    "attr" : [ <item-attribute...> ] ,
+    "payload" : <item-payload> 
+  }
+
+***/
+
+
+/* Sets are immutable, and have a dichotomical array of items, so
+
+****/
 /* item payload */
 enum iacapayloadkind_en
 {
