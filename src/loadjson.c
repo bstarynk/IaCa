@@ -26,6 +26,14 @@ enum iacajsonstate_en
 {
   IACAJS__NONE,
   IACAJS_FRESHVAL,		/* parsing a fresh IacaValue */
+  IACAJS_WAITKINDVAL,		/* wait the kind of a value */
+  IACAJS_WAITINTEGERVAL,	/* wait the number for an integer value */
+  IACAJS_WAITSTRINGVAL,		/* wait the string for a string value */
+  IACAJS_WAITNODEVAL,		/* wait the node for a node value */
+  IACAJS_WAITSETVAL,		/* wait the set for a set value */
+  IACAJS_WAITITEMVAL,		/* wait the item reference for an item value */
+  IACAJS_LONG,
+  IACAJS_STRING,
 };
 
 struct iacajsonstate_st
@@ -33,7 +41,9 @@ struct iacajsonstate_st
   enum iacajsonstate_en js_state;
   union
   {
+    void *js_ptr;
     long js_num;
+    char *js_str;
   };
 };
 
@@ -160,6 +170,22 @@ iaca_json_value_pop (struct iacaloader_st *ld)
 }
 
 static inline void
+iaca_json_state_push (struct iacaloader_st *ld, enum iacajsonstate_en ste)
+{
+  int ln = 0;
+  GArray *sta = 0;
+  struct iacajsonstate_st newst = { 0 };
+  if (!ld)
+    return;
+  sta = ld->ld_statestack;
+  if (!sta)
+    return;
+  memset (&newst, 0, sizeof (newst));
+  newst.js_state = ste;
+  g_array_append_val (sta, newst);
+}
+
+static inline void
 iaca_json_state_pop (struct iacaloader_st *ld)
 {
   int ln = 0;
@@ -198,6 +224,9 @@ static int
 iacaloadyajl_boolean (void *ctx, int b)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
   return 0;
 }
 
@@ -205,6 +234,26 @@ static int
 iacaloadyajl_number (void *ctx, const char *s, unsigned l)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  switch (topst->js_state)
+    {
+    case IACAJS_LONG:
+    case IACAJS_WAITINTEGERVAL:
+      {
+	char *end = 0;
+	long l = strtol (s, &end, 0);
+	topst->js_num = l;
+	return 1;
+      }
+    case IACAJS_WAITNODEVAL:
+      {
+	char *end = 0;
+	long long llid = strtoll (s, &end, 0);
+	IacaItem *connitm = iaca_retrieve_loaded_item (ld, llid);
+      }
+    }
   return 0;
 }
 
@@ -213,6 +262,51 @@ static int
 iacaloadyajl_string (void *ctx, const unsigned char *str, unsigned slen)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  switch (topst->js_state)
+    {
+    case IACAJS_STRING:
+    case IACAJS_WAITSTRINGVAL:
+      {
+	char *s = iaca_alloc_atomic (slen + 1);
+	memcpy (s, str, slen);
+	topst->js_str = s;
+	return 1;
+      }
+    case IACAJS_WAITKINDVAL:
+      {
+	if (!strncmp ("intv", str, slen))
+	  {
+	    /* expect an int value */
+	  }
+	else if (!strncmp ("strv", str, slen))
+	  {
+	    /* expect a string value */
+	    topst->js_state = IACAJS_WAITSTRINGVAL;
+	    return 1;
+	  }
+	else if (!strncmp ("nodv", str, slen))
+	  {
+	    /* expect a node value */
+	    topst->js_state = IACAJS_WAITNODEVAL;
+	    return 1;
+	  }
+	else if (!strncmp ("setv", str, slen))
+	  {
+	    /* expect a set value */
+	    topst->js_state = IACAJS_WAITSETVAL;
+	    return 1;
+	  }
+	else if (!strncmp ("itrv", str, slen))
+	  {
+	    /* expect an item reference value */
+	    topst->js_state = IACAJS_WAITITEMVAL;
+	    return 1;
+	  }
+      }
+    }
   return 0;
 }
 
@@ -220,6 +314,28 @@ static int
 iacaloadyajl_map_key (void *ctx, const unsigned char *str, unsigned int slen)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  switch (topst->js_state)
+    {
+    case IACAJS_WAITKINDVAL:
+      if (!strncmp ("kd", str, slen))
+	return 1;
+      break;
+    case IACAJS_WAITSTRINGVAL:
+      if (!strncmp ("str", str, slen))
+	return 1;
+      break;
+    case IACAJS_WAITINTEGERVAL:
+      if (!strncmp ("int", str, slen))
+	return 1;
+      break;
+    case IACAJS_WAITNODEVAL:
+      if (!strncmp ("conn", str, slen))
+	return 1;
+      break;
+    }
   return 0;
 }
 
@@ -228,6 +344,15 @@ static int
 iacaloadyajl_start_map (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  switch (topst->js_state)
+    {
+    case IACAJS_FRESHVAL:
+      topst->js_state = IACAJS_WAITKINDVAL;
+      return 1;
+    }
   return 0;
 }
 

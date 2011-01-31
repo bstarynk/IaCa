@@ -86,7 +86,7 @@ struct iacavalue_st
 
 /******************** BOXED INTEGERS *************/
 /*** JSON:
-     { "kd" : "int" , "int" : <number> } 
+     { "kd" : "intv" , "int" : <number> } 
 ***/
 struct iacainteger_st
 {
@@ -110,7 +110,7 @@ static inline IacaInteger *iacac_integer (IacaValue *v);
 
 /******************** STRING VALUES *************/
 /*** JSON:
-     { "kd" : "str" , "str" : <string> } 
+     { "kd" : "strv" , "str" : <string> } 
 ***/
 
 struct iacastring_st
@@ -141,7 +141,7 @@ static inline IacaString *iacac_string (IacaValue *v);
 
 /***************** NODE VALUES ****************/
 /*** JSON:
-     { "kd" : "node" , "con" : <int-id> , "sons" : [ <son-values...> ] } 
+     { "kd" : "nodv" , "conn" : <int-id> , "sons" : [ <son-values...> ] } 
 ***/
 
 /* Nodes are immutable, and have a non-null connector item and sons */
@@ -188,7 +188,7 @@ static inline IacaNode *iacac_node (IacaValue *v);
 
 /***************** SET VALUES ****************/
 /*** JSON:
-     { "kd" : "set" ,  "elem" : [ <element-ids...> ] } 
+     { "kd" : "setv" ,  "elem" : [ <element-ids...> ] } 
 ***/
 
 
@@ -233,7 +233,7 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
   (= pointers to IacaItem) and item contents (=the data inside a
   IacaItem). 
   Item references are serialized as
-  { "kd" : "itr" ,  "id" : <id-number> } 
+  { "kd" : "itrv" ,  "id" : <id-number> } 
 
   Item contents are serialized like
   { "item" : <id-number> ,
