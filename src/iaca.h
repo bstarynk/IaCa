@@ -48,6 +48,40 @@
 // Boehm's garbage collector
 #include <gc/gc.h>
 
+/*****************************************************************/
+/* error reporting */
+
+/* fatal error: */
+#define iaca_error(Fmt,...) do {		\
+g_error("%s:%d <%s> " Fmt "\n",			\
+	basename(__FILE__), __LINE__, __func__, \
+##__VA_ARGS__); } while(0)
+
+/* critical error: */
+#define iaca_critical(Fmt,...) do {			\
+    g_critical ("%s:%d <%s> " Fmt "\n",			\
+		basename(__FILE__), __LINE__, __func__,	\
+		##__VA_ARGS__); } while(0)
+
+/* warning: */
+#define iaca_warning(Fmt,...) do {			\
+    g_warning ("%s:%d <%s> " Fmt "\n",			\
+		basename(__FILE__), __LINE__, __func__,	\
+		##__VA_ARGS__); } while(0)
+
+/* information message: */
+#define iaca_message(Fmt,...) do {			\
+    g_message ("%s:%d <%s> " Fmt "\n",			\
+		basename(__FILE__), __LINE__, __func__,	\
+		##__VA_ARGS__); } while(0)
+
+/* debug message: */
+#define iaca_debug(Fmt,...) do {			\
+    g_debug ("%s:%d <%s> " Fmt "\n",			\
+	     basename(__FILE__), __LINE__, __func__,	\
+	     ##__VA_ARGS__); } while(0)
+
+/*****************************************************************/
 // allocate a garbage collected data and clear it. The data might
 // later contain pointers and other things to be followed by the
 // garbage collector.
@@ -689,4 +723,6 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 
 #define IACA_MANIFEST_FILE "IaCa_Manifest"
 
+GHashTable *iaca_module_htab;
+GHashTable *iaca_data_htab;
 #endif /*IACA_INCLUDED */

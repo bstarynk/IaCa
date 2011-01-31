@@ -143,7 +143,6 @@ iaca_json_top_value (struct iacaloader_st *ld)
 static inline void
 iaca_json_value_push (struct iacaloader_st *ld, IacaValue *va)
 {
-  int ln = 0;
   GPtrArray *sta = 0;
   if (!ld)
     return;
@@ -172,7 +171,6 @@ iaca_json_value_pop (struct iacaloader_st *ld)
 static inline void
 iaca_json_state_push (struct iacaloader_st *ld, enum iacajsonstate_en ste)
 {
-  int ln = 0;
   GArray *sta = 0;
   struct iacajsonstate_st newst = { 0 };
   if (!ld)
@@ -277,29 +275,29 @@ iacaloadyajl_string (void *ctx, const unsigned char *str, unsigned slen)
       }
     case IACAJS_WAITKINDVAL:
       {
-	if (!strncmp ("intv", str, slen))
+	if (!strncmp ("intv", (char *) str, slen))
 	  {
 	    /* expect an int value */
 	  }
-	else if (!strncmp ("strv", str, slen))
+	else if (!strncmp ("strv", (char *) str, slen))
 	  {
 	    /* expect a string value */
 	    topst->js_state = IACAJS_WAITSTRINGVAL;
 	    return 1;
 	  }
-	else if (!strncmp ("nodv", str, slen))
+	else if (!strncmp ("nodv", (char *) str, slen))
 	  {
 	    /* expect a node value */
 	    topst->js_state = IACAJS_WAITNODEVAL;
 	    return 1;
 	  }
-	else if (!strncmp ("setv", str, slen))
+	else if (!strncmp ("setv", (char *) str, slen))
 	  {
 	    /* expect a set value */
 	    topst->js_state = IACAJS_WAITSETVAL;
 	    return 1;
 	  }
-	else if (!strncmp ("itrv", str, slen))
+	else if (!strncmp ("itrv", (char *) str, slen))
 	  {
 	    /* expect an item reference value */
 	    topst->js_state = IACAJS_WAITITEMVAL;
@@ -320,19 +318,19 @@ iacaloadyajl_map_key (void *ctx, const unsigned char *str, unsigned int slen)
   switch (topst->js_state)
     {
     case IACAJS_WAITKINDVAL:
-      if (!strncmp ("kd", str, slen))
+      if (!strncmp ("kd", (char *) str, slen))
 	return 1;
       break;
     case IACAJS_WAITSTRINGVAL:
-      if (!strncmp ("str", str, slen))
+      if (!strncmp ("str", (char *) str, slen))
 	return 1;
       break;
     case IACAJS_WAITINTEGERVAL:
-      if (!strncmp ("int", str, slen))
+      if (!strncmp ("int", (char *) str, slen))
 	return 1;
       break;
     case IACAJS_WAITNODEVAL:
-      if (!strncmp ("conn", str, slen))
+      if (!strncmp ("conn", (char *) str, slen))
 	return 1;
       break;
     }
@@ -392,14 +390,53 @@ static yajl_callbacks lacaloadyajl_callbacks = {
   .yajl_end_array = iacaloadyajl_end_array
 };
 
-static void
+void
 iaca_load (const char *dirpath)
 {
   gchar *manipath = 0;
   struct iacaloader_st ld = { 0 };
+  char *line = 0;
+  size_t siz = 0;
+  FILE *fil = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
   manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
   memset (&ld, 0, sizeof (ld));
   ld.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
+  fil = fopen (manipath, "r");
+  if (!fil)
+    iaca_error ("failed to open manifest file %s - %m", manipath);
+  siz = 80;
+  line = calloc (siz, 1);
+  iaca_module_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  iaca_data_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  while (!feof (fil))
+    {
+      ssize_t linlen = getline (&line, &siz, fil);
+      char *name = 0;
+      // skip comment or empty line in manifest
+      if (line[0] == '#' || line[0] == '\n')
+	continue;
+      if (sscanf (line, " IACAMODULE %as", &name))
+	{
+	  iaca_debug ("module '%s'", name);
+	  GModule *mod = g_module_open (name, 0);
+	  if (!mod)
+	    iaca_error ("failed to load module '%s' - %s",
+			name, g_module_error ());
+	  g_hash_table_insert (iaca_module_htab, g_strdup (name), mod);
+	}
+      else if (sscanf (line, " IACADATA %as", &name))
+	{
+	  char *datapath = 0;
+	  iaca_debug ("data '%s'", name);
+	  datapath = g_build_filename (dirpath,
+				       g_strconcat (name, ".json", NULL),
+				       NULL);
+	  iaca_debug ("datapath '%s'", datapath);
+	  if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
+	    iaca_error ("data file %s does not exist", datapath);
+#warning should load the datapath
+	}
+    }
 }

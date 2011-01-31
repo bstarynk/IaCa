@@ -293,4 +293,6 @@ main (int argc, char **argv)
 {
   GC_INIT ();
   gtk_init (&argc, &argv);
+#warning temporary load current directory
+  iaca_load (".");
 }
