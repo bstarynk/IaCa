@@ -176,7 +176,7 @@ static inline IacaString *iacac_string (IacaValue *v);
 
 /***************** NODE VALUES ****************/
 /*** JSON:
-     { "kd" : "nodv" , "conn" : <int-id> , "sons" : [ <son-values...> ] } 
+     { "kd" : "nodv" , "conid" : <int-id> , "sons" : [ <son-values...> ] } 
 ***/
 
 /* Nodes are immutable, and have a non-null connector item and sons */
