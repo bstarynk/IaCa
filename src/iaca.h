@@ -77,10 +77,12 @@ g_error("%s:%d <%s> " Fmt "\n",			\
 		##__VA_ARGS__); } while(0)
 
 /* debug message: */
-#define iaca_debug(Fmt,...) do {			\
-    g_debug ("%s:%d <%s> " Fmt "\n",			\
-	     basename(__FILE__), __LINE__, __func__,	\
+#define iaca_debug_at(Fil,Lin,Fmt,...) do {	\
+    g_debug ("%s:%d <%s> " Fmt,			\
+	     basename(Fil), Lin, __func__,	\
 	     ##__VA_ARGS__); } while(0)
+#define iaca_debug(Fmt,...) \
+ iaca_debug_at(__FILE__,__LINE__,Fmt,##__VA_ARGS__)
 
 /*****************************************************************/
 // allocate a garbage collected data and clear it. The data might
@@ -195,6 +197,8 @@ struct iacanode_st
 // connective
 extern IacaNode *iaca_node_make (IacaValue *conn, IacaValue *sontab[],
 				 unsigned arity);
+#define iacav_node_make(Con,Sons,Ari) \
+  ((IacaValue*)iaca_node_make((Con),(Sons),(Ari)))
 // variadic allocator of a node with its sons, null terminated
 extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
   __attribute__ ((sentinel));
@@ -726,4 +730,5 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 
 GHashTable *iaca_module_htab;
 GHashTable *iaca_data_htab;
+void iaca_load (const char *);
 #endif /*IACA_INCLUDED */

@@ -157,8 +157,9 @@ iaca_json_top_value (struct iacaloader_st *ld)
   return (IacaValue *) g_ptr_array_index (sta, ln - 1);
 }
 
+#define iaca_json_value_push(Ld,Va) iaca_json_value_push_at(__LINE__,(Ld),(Va))
 static inline void
-iaca_json_value_push (struct iacaloader_st *ld, IacaValue *va)
+iaca_json_value_push_at (int lin, struct iacaloader_st *ld, IacaValue *va)
 {
   GPtrArray *sta = 0;
   if (!ld)
@@ -166,11 +167,13 @@ iaca_json_value_push (struct iacaloader_st *ld, IacaValue *va)
   sta = ld->ld_valstack;
   if (!sta)
     return;
+  iaca_debug_at (__FILE__, lin, "push value [%d] %p", sta->len, va);
   g_ptr_array_add (sta, va);
 }
 
+#define iaca_json_value_pop(Ld) iaca_json_value_pop_at(__LINE__,(Ld))
 static inline void
-iaca_json_value_pop (struct iacaloader_st *ld)
+iaca_json_value_pop_at (int lin, struct iacaloader_st *ld)
 {
   int ln = 0;
   GPtrArray *sta = 0;
@@ -182,11 +185,14 @@ iaca_json_value_pop (struct iacaloader_st *ld)
   ln = sta->len;
   if (ln <= 0)
     return;
+  iaca_debug_at (__FILE__, lin, "pop value [%d]", sta->len);
   g_ptr_array_remove_index (sta, ln - 1);
 }
 
+#define iaca_json_state_push(Ld,St) iaca_json_state_push_at(__LINE__,(Ld),(St))
 static inline void
-iaca_json_state_push (struct iacaloader_st *ld, enum iacajsonstate_en ste)
+iaca_json_state_push_at (int lin, struct iacaloader_st *ld,
+			 enum iacajsonstate_en ste)
 {
   GArray *sta = 0;
   struct iacajsonstate_st newst = { 0 };
@@ -197,11 +203,14 @@ iaca_json_state_push (struct iacaloader_st *ld, enum iacajsonstate_en ste)
     return;
   memset (&newst, 0, sizeof (newst));
   newst.js_state = ste;
+  iaca_debug_at (__FILE__, lin, "push state [%d] #%d %s", sta->len,
+		 (int) ste, iacajs_state_names[(int) ste]);
   g_array_append_val (sta, newst);
 }
 
+#define iaca_json_state_pop(Ld) iaca_json_state_pop_at(__LINE__,(Ld))
 static inline void
-iaca_json_state_pop (struct iacaloader_st *ld)
+iaca_json_state_pop_at (int lin, struct iacaloader_st *ld)
 {
   int ln = 0;
   GArray *sta = 0;
@@ -213,6 +222,7 @@ iaca_json_state_pop (struct iacaloader_st *ld)
   ln = sta->len;
   if (ln <= 0)
     return;
+  iaca_debug_at (__FILE__, lin, "pop state [%d]", ln);
   g_array_remove_index (sta, ln - 1);
 }
 
@@ -412,6 +422,9 @@ iacaloadyajl_start_map (void *ctx)
     case IACAJS_FRESHVAL:
       topst->js_state = IACAJS_WAITVALKIND;
       return 1;
+    case IACAJS_WAITNODESONS:
+      iaca_json_state_push (ld, IACAJS_WAITVALKIND);
+      return 1;
     default:
       return 0;
     }
@@ -499,6 +512,20 @@ iacaloadyajl_end_array (void *ctx)
 	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
   switch (topst->js_state)
     {
+    case IACAJS_WAITNODESONS:
+      {
+	IacaValue *newnod =
+	  iacav_node_make ((IacaValue *) topst->js_node_conn,
+			   topst->js_node_sons, topst->js_node_arity);
+	GC_FREE (topst->js_node_sons);
+	topst->js_node_sons = 0;
+	topst->js_node_arity = topst->js_node_sizesons = 0;
+	topst->js_node_conn = 0;
+	iaca_json_state_pop (ld);
+	iaca_json_value_push (ld, newnod);
+	iaca_debug ("newnod %p", newnod);
+	return 1;
+      }
     default:
       return 0;
     }
