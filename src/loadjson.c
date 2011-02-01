@@ -22,18 +22,25 @@
 
 
 /* the JSON loader has a stack of values and a stack of states. Each state is */
+#define IACAJS_STATES_LIST()           \
+  IACAJS_STATE(IACAJS__NONE),          \
+  IACAJS_STATE(IACAJS_FRESHVAL),       \
+  IACAJS_STATE(IACAJS_WAITVALKIND),    \
+  IACAJS_STATE(IACAJS_WAITITEMID),     \
+  IACAJS_STATE(IACAJS_DONEVAL),        \
+  IACAJS_STATE(IACAJS__LAST)
+
 enum iacajsonstate_en
 {
-  IACAJS__NONE,
-  IACAJS_FRESHVAL,		/* parsing a fresh IacaValue */
-  IACAJS_WAITKINDVAL,		/* wait the kind of a value */
-  IACAJS_WAITINTEGERVAL,	/* wait the number for an integer value */
-  IACAJS_WAITSTRINGVAL,		/* wait the string for a string value */
-  IACAJS_WAITNODEVAL,		/* wait the node for a node value */
-  IACAJS_WAITSETVAL,		/* wait the set for a set value */
-  IACAJS_WAITITEMVAL,		/* wait the item reference for an item value */
-  IACAJS_LONG,
-  IACAJS_STRING,
+#define IACAJS_STATE(St) St
+  IACAJS_STATES_LIST ()
+#undef IACAJS_STATE
+};
+
+static const char *iacajs_state_names[] = {
+#define IACAJS_STATE(St) #St
+  IACAJS_STATES_LIST (),
+  (char *) 0
 };
 
 struct iacajsonstate_st
@@ -209,11 +216,16 @@ iacaloadyajl_null (void *ctx)
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   if (!topst)
     return 0;
-  if (topst->js_state == IACAJS_FRESHVAL)
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
     {
+    case IACAJS_FRESHVAL:
       iaca_json_state_pop (ld);
       iaca_json_value_push (ld, NULL);
       return 1;
+    default:
+      return 0;
     }
   return 0;
 }
@@ -225,32 +237,35 @@ iacaloadyajl_boolean (void *ctx, int b)
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   if (!topst)
     return 0;
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
   return 0;
 }
 
 static int
-iacaloadyajl_number (void *ctx, const char *s, unsigned l)
+iacaloadyajl_number (void *ctx, const char *s, unsigned slen)
 {
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  long long ll = 0;
+  char *end = 0;
   if (!topst)
     return 0;
+  ll = strtoll (s, &end, 0);
+  iaca_debug ("state #%d [%s] ll %lld", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST], ll);
   switch (topst->js_state)
     {
-    case IACAJS_LONG:
-    case IACAJS_WAITINTEGERVAL:
+    case IACAJS_WAITITEMID:
       {
-	char *end = 0;
-	long l = strtol (s, &end, 0);
-	topst->js_num = l;
+	IacaItem *itm = iaca_retrieve_loaded_item (ld, ll);
+	iaca_debug ("item #%lld %p", ll, itm);
+	iaca_json_value_push (ld, (IacaValue *) itm);
+	topst->js_state = IACAJS_DONEVAL;
 	return 1;
       }
-    case IACAJS_WAITNODEVAL:
-      {
-	char *end = 0;
-	long long llid = strtoll (s, &end, 0);
-	IacaItem *connitm = iaca_retrieve_loaded_item (ld, llid);
-      }
+    default:
+      return 0;
     }
   return 0;
 }
@@ -263,47 +278,19 @@ iacaloadyajl_string (void *ctx, const unsigned char *str, unsigned slen)
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   if (!topst)
     return 0;
+  iaca_debug ("state #%d [%s] str %.*s", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST], slen, str);
   switch (topst->js_state)
     {
-    case IACAJS_STRING:
-    case IACAJS_WAITSTRINGVAL:
-      {
-	char *s = iaca_alloc_atomic (slen + 1);
-	memcpy (s, str, slen);
-	topst->js_str = s;
-	return 1;
-      }
-    case IACAJS_WAITKINDVAL:
-      {
-	if (!strncmp ("intv", (char *) str, slen))
-	  {
-	    /* expect an int value */
-	  }
-	else if (!strncmp ("strv", (char *) str, slen))
-	  {
-	    /* expect a string value */
-	    topst->js_state = IACAJS_WAITSTRINGVAL;
-	    return 1;
-	  }
-	else if (!strncmp ("nodv", (char *) str, slen))
-	  {
-	    /* expect a node value */
-	    topst->js_state = IACAJS_WAITNODEVAL;
-	    return 1;
-	  }
-	else if (!strncmp ("setv", (char *) str, slen))
-	  {
-	    /* expect a set value */
-	    topst->js_state = IACAJS_WAITSETVAL;
-	    return 1;
-	  }
-	else if (!strncmp ("itrv", (char *) str, slen))
-	  {
-	    /* expect an item reference value */
-	    topst->js_state = IACAJS_WAITITEMVAL;
-	    return 1;
-	  }
-      }
+    case IACAJS_WAITVALKIND:
+      if (!strncmp ("itrv", (const char *) str, slen))
+	{
+	  topst->js_state = IACAJS_WAITITEMID;
+	  return 1;
+	}
+      break;
+    default:
+      return 0;
     }
   return 0;
 }
@@ -315,24 +302,21 @@ iacaloadyajl_map_key (void *ctx, const unsigned char *str, unsigned int slen)
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   if (!topst)
     return 0;
+  iaca_debug ("state #%d [%s] key %.*s",
+	      (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST], slen, str);
   switch (topst->js_state)
     {
-    case IACAJS_WAITKINDVAL:
-      if (!strncmp ("kd", (char *) str, slen))
+    case IACAJS_WAITVALKIND:
+      if (!strncmp ("kd", (const char *) str, slen))
 	return 1;
       break;
-    case IACAJS_WAITSTRINGVAL:
-      if (!strncmp ("str", (char *) str, slen))
+    case IACAJS_WAITITEMID:
+      if (!strncmp ("id", (const char *) str, slen))
 	return 1;
       break;
-    case IACAJS_WAITINTEGERVAL:
-      if (!strncmp ("int", (char *) str, slen))
-	return 1;
-      break;
-    case IACAJS_WAITNODEVAL:
-      if (!strncmp ("conn", (char *) str, slen))
-	return 1;
-      break;
+    default:
+      return 0;
     }
   return 0;
 }
@@ -345,11 +329,15 @@ iacaloadyajl_start_map (void *ctx)
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   if (!topst)
     return 0;
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
   switch (topst->js_state)
     {
     case IACAJS_FRESHVAL:
-      topst->js_state = IACAJS_WAITKINDVAL;
+      topst->js_state = IACAJS_WAITVALKIND;
       return 1;
+    default:
+      return 0;
     }
   return 0;
 }
@@ -358,6 +346,19 @@ static int
 iacaloadyajl_end_map (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
+    {
+    case IACAJS_DONEVAL:
+      iaca_json_state_pop (ld);
+      return 1;
+    default:
+      return 0;
+    }
   return 0;
 }
 
@@ -366,6 +367,16 @@ static int
 iacaloadyajl_start_array (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
+    {
+    default:
+      return 0;
+    }
   return 0;
 }
 
@@ -373,12 +384,22 @@ static int
 iacaloadyajl_end_array (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  if (!topst)
+    return 0;
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
+    {
+    default:
+      return 0;
+    }
   return 0;
 }
 
 
 
-static yajl_callbacks lacaloadyajl_callbacks = {
+static const yajl_callbacks iacaloadyajl_callbacks = {
   .yajl_null = iacaloadyajl_null,
   .yajl_boolean = iacaloadyajl_boolean,
   .yajl_number = iacaloadyajl_number,
@@ -389,6 +410,86 @@ static yajl_callbacks lacaloadyajl_callbacks = {
   .yajl_start_array = iacaloadyajl_start_array,
   .yajl_end_array = iacaloadyajl_end_array
 };
+
+static void
+iaca_yajl_free (void *ctx, void *ptr)
+{
+  GC_FREE (ptr);
+}
+
+static void *
+iaca_yajl_malloc (void *ctx, unsigned sz)
+{
+  void *ptr = 0;
+  ptr = iaca_alloc_data (sz);
+  return ptr;
+}
+
+static void *
+iaca_yajl_realloc (void *ctx, void *ptr, unsigned sz)
+{
+  ptr = GC_REALLOC (ptr, sz);
+  return ptr;
+}
+
+static const yajl_alloc_funcs iaca_yajl_alloc_functions = {
+  .malloc = iaca_yajl_malloc,
+  .free = iaca_yajl_free,
+  .realloc = iaca_yajl_realloc,
+};
+
+static const yajl_parser_config iaca_yajl_parserconf = {.allowComments =
+    1,.checkUTF8 = 1
+};
+
+void
+iaca_load_data (struct iacaloader_st *ld, const char *datapath)
+{
+  FILE *datafil = 0;
+  char *line = 0;
+  size_t linsz = 0;
+  int linenum = 0;
+  yajl_status stat = yajl_status_ok;
+  g_assert (ld != NULL);
+  g_assert (ld->ld_json == NULL);
+  datafil = fopen (datapath, "r");
+  if (!datafil)
+    iaca_error ("failed to open data file %s - %m", datapath);
+  ld->ld_json =
+    yajl_alloc (&iacaloadyajl_callbacks, &iaca_yajl_parserconf,
+		&iaca_yajl_alloc_functions, ld);
+  ld->ld_valstack = g_ptr_array_new ();
+  ld->ld_statestack =
+    g_array_new (TRUE, TRUE, sizeof (struct iacajsonstate_st));
+  linsz = 256;
+  line = calloc (linsz, 1);
+  iaca_json_state_push (ld, IACAJS_FRESHVAL);
+  while (!feof (datafil))
+    {
+      ssize_t linlen = getline (&line, &linsz, datafil);
+      linenum++;
+      stat = yajl_parse (ld->ld_json, (const unsigned char *) line, linlen);
+      if (stat != yajl_status_ok && stat != yajl_status_insufficient_data)
+	iaca_error ("in file %s line %d YAJL JSON parse error: %s",
+		    datapath, (int) linenum,
+		    yajl_get_error (ld->ld_json, TRUE,
+				    (const unsigned char *) line, linlen));
+    };
+  stat = yajl_parse_complete (ld->ld_json);
+  if (stat != yajl_status_ok)
+    iaca_error ("YAJL parse error at end of %s: %s",
+		datapath, yajl_get_error (ld->ld_json, FALSE,
+					  (const unsigned char *) 0, 0));
+  fclose (datafil);
+  free (line);
+  yajl_free (ld->ld_json);
+  g_ptr_array_free (ld->ld_valstack, TRUE);
+  ld->ld_valstack = 0;
+  g_array_free (ld->ld_statestack, TRUE);
+  ld->ld_statestack = 0;
+  ld->ld_json = 0;
+  iaca_debug ("successfully loaded data file %s", datapath);
+}
 
 void
 iaca_load (const char *dirpath)
@@ -415,9 +516,9 @@ iaca_load (const char *dirpath)
       ssize_t linlen = getline (&line, &siz, fil);
       char *name = 0;
       // skip comment or empty line in manifest
-      if (line[0] == '#' || line[0] == '\n')
+      if (line[0] == '#' || line[0] == '\n' || linlen <= 0)
 	continue;
-      if (sscanf (line, " IACAMODULE %as", &name))
+      if (sscanf (line, " IACAMODULE %ms", &name))
 	{
 	  iaca_debug ("module '%s'", name);
 	  GModule *mod = g_module_open (name, 0);
@@ -426,7 +527,7 @@ iaca_load (const char *dirpath)
 			name, g_module_error ());
 	  g_hash_table_insert (iaca_module_htab, g_strdup (name), mod);
 	}
-      else if (sscanf (line, " IACADATA %as", &name))
+      else if (sscanf (line, " IACADATA %ms", &name))
 	{
 	  char *datapath = 0;
 	  iaca_debug ("data '%s'", name);
@@ -436,7 +537,7 @@ iaca_load (const char *dirpath)
 	  iaca_debug ("datapath '%s'", datapath);
 	  if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
 	    iaca_error ("data file %s does not exist", datapath);
-#warning should load the datapath
+	  iaca_load_data (&ld, datapath);
 	}
     }
 }

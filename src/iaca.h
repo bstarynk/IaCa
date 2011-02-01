@@ -39,6 +39,7 @@
 
 
 // YAJL include for JSON
+#include <yajl/yajl_common.h>
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_gen.h>
 
