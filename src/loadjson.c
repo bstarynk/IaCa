@@ -31,6 +31,7 @@
   IACAJS_STATE(IACAJS_WAITNODECONN),		\
   IACAJS_STATE(IACAJS_WAITITEMID),		\
   IACAJS_STATE(IACAJS_GOTVAL),			\
+  IACAJS_STATE(IACAJS_GOTNODESONS),		\
   IACAJS_STATE(IACAJS__LAST)
 
 enum iacajsonstate_en
@@ -449,6 +450,7 @@ iacaloadyajl_start_map (void *ctx)
 static int
 iacaloadyajl_end_map (void *ctx)
 {
+  IacaValue *val = 0;
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
@@ -460,8 +462,9 @@ iacaloadyajl_end_map (void *ctx)
   switch (topst->js_state)
     {
     case IACAJS_GOTVAL:
+    set_value:
       {
-	IacaValue *val = topst->js_val;
+	val = topst->js_val;
 	iaca_debug ("got val %p", val);
 	iaca_json_state_pop (ld);
 	topst = iaca_json_top_state (ld);
@@ -493,6 +496,17 @@ iacaloadyajl_end_map (void *ctx)
 	iaca_debug ("son #%d %p", topst->js_node_arity, val);
 	iaca_json_state_add_node_son (topst, val);
 	return 1;
+      }
+    case IACAJS_GOTNODESONS:
+      {
+	IacaValue* val = 0;
+	g_assert (topst->js_node_conn != 0);
+	iaca_debug("making node of conn %p and arity %d", 
+		   topst->js_node_conn, topst->js_node_arity);
+	topst->js_val = val 
+	  = iacav_node_make((IacaValue*)topst->js_node_conn, 
+			    topst->js_node_sons, topst->js_node_arity);
+	goto set_value;
       }
     default:
       iaca_debug ("fail");
@@ -547,24 +561,14 @@ iacaloadyajl_end_array (void *ctx)
     {
     case IACAJS_WAITNODESONS:
       {
-	IacaValue *newnod =
-	  iacav_node_make ((IacaValue *) topst->js_node_conn,
-			   topst->js_node_sons, topst->js_node_arity);
-	iaca_debug ("newnod %p conn %p arity %d",
-		    newnod, topst->js_node_conn, topst->js_node_arity);
-	GC_FREE (topst->js_node_sons);
-	topst->js_node_sons = 0;
-	topst->js_node_arity = topst->js_node_sizesons = 0;
-	topst->js_node_conn = 0;
-	topst->js_val = newnod;
-	topst->js_state = IACAJS_GOTVAL;
-	iaca_debug ("gotval newnod %p ok", newnod);
+	topst->js_state = IACAJS_GOTNODESONS;
+	iaca_debug ("gotsons arity %d", topst->js_node_arity);
 	return 1;
       }
     default:
+      iaca_debug("failed");
       return 0;
     }
-  return 0;
 }
 
 
