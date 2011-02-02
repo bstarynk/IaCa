@@ -294,7 +294,14 @@ enum iacapayloadkind_en
   IACAPAYLOAD_DICTIONNARY,
 };
 
-/* item structure */
+/* Item structure; each has a unique 64 bits identifying unique
+   integer. On an Intel Q9550 @ 2.83GHz, incrementing a counter in a
+   buzy loop takes 2.12ns/iter, that is 77 years to reach 2^60. If
+   calling a GC_MALLOC inside a loop, it takes at least 53ns/iter,
+   that is 1935 years to reach 2^60. So incrementing a persistent 64
+   bits counter seems practical, even on a 10x time faster machine for
+   several years. On a more recent AMD Phenom(tm) II X4 955 timings
+   are similar. */
 struct iacaitem_st
 {
   unsigned v_kind;		/* always IACAV_ITEM */

@@ -221,6 +221,10 @@ iaca_json_got_value_at (int lin, struct iacaloader_st *ld, IacaValue *val)
       iaca_json_state_add_node_son (topst, val);
       iaca_debug ("added son @ %p", val);
       return true;
+    case IACAJS_WAITVAL:
+      topst->js_val = val;
+      iaca_debug ("set val @ %p", val);
+      return true;
     default:
       iaca_debug ("fail");
       return false;
@@ -435,7 +439,7 @@ iacaloadyajl_start_map (void *ctx)
     {
     case IACAJS_WAITVAL:
       iaca_debug ("waiting kind");
-      topst->js_state = IACAJS_WAITKIND;
+      iaca_json_state_push (ld, IACAJS_WAITKIND);
       return 1;
     case IACAJS_WAITNODESONS:
       iaca_json_state_push (ld, IACAJS_WAITKIND);
@@ -640,6 +644,7 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath)
     {
       ssize_t linlen = getline (&line, &linsz, datafil);
       linenum++;
+      iaca_debug ("line %d: %s", linenum, line);
       stat = yajl_parse (ld->ld_json, (const unsigned char *) line, linlen);
       if (stat != yajl_status_ok && stat != yajl_status_insufficient_data)
 	iaca_error ("in file %s line %d YAJL JSON parse error: %s",
@@ -647,7 +652,9 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath)
 		    yajl_get_error (ld->ld_json, TRUE,
 				    (const unsigned char *) line, linlen));
     };
+  iaca_debug("before yajl_parse_complete stat %d", (int)stat);
   stat = yajl_parse_complete (ld->ld_json);
+  iaca_debug("after yajl_parse_complete stat %d", (int)stat);
   if (stat != yajl_status_ok)
     iaca_error ("YAJL parse error at end of %s: %s",
 		datapath, yajl_get_error (ld->ld_json, FALSE,

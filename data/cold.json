@@ -1,8 +1,15 @@
 // file cold.json
-{ "kd" : "nodv",
-  "conid" : 1,
-  "sons" : [
-    { "kd" : "intv", "int": 12 },
-    { "kd" : "itrv", "id": 1 }
+{
+  "kd": "nodv",
+  "conid": 1,
+  "sons": [
+    {
+      "kd": "intv",
+      "int": 12
+    },
+    {
+      "kd": "itrv",
+      "id": 1
+    }
   ]
 }
