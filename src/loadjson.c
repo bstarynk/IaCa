@@ -22,15 +22,15 @@
 
 
 /* the JSON loader has a stack of values and a stack of states. Each state is */
-#define IACAJS_STATES_LIST()           \
-  IACAJS_STATE(IACAJS__NONE),          \
-  IACAJS_STATE(IACAJS_FRESHVAL),       \
-  IACAJS_STATE(IACAJS_WAITVALKIND),    \
-  IACAJS_STATE(IACAJS_WAITITEMID),     \
-  IACAJS_STATE(IACAJS_WAITNODECONN),   \
-  IACAJS_STATE(IACAJS_WAITNODESONS),   \
-  IACAJS_STATE(IACAJS_WAITINTVAL),     \
-  IACAJS_STATE(IACAJS_DONEVAL),        \
+#define IACAJS_STATES_LIST()			\
+  IACAJS_STATE(IACAJS__NONE),			\
+  IACAJS_STATE(IACAJS_WAITVAL),			\
+  IACAJS_STATE(IACAJS_WAITINTVAL),     		\
+  IACAJS_STATE(IACAJS_WAITKIND),		\
+  IACAJS_STATE(IACAJS_WAITNODESONS),		\
+  IACAJS_STATE(IACAJS_WAITNODECONN),		\
+  IACAJS_STATE(IACAJS_WAITITEMID),		\
+  IACAJS_STATE(IACAJS_GOTVAL),			\
   IACAJS_STATE(IACAJS__LAST)
 
 enum iacajsonstate_en
@@ -49,6 +49,7 @@ static const char *iacajs_state_names[] = {
 struct iacajsonstate_st
 {
   enum iacajsonstate_en js_state;
+  IacaValue *js_val;
   union
   {
     void *js_ptr;
@@ -71,10 +72,8 @@ struct iacaloader_st
   GHashTable *ld_itemhtab;
   /* the handle to the YAJL JSON parser. See git://github.com/lloyd/yajl */
   yajl_handle ld_json;
-  /* Glib array, stack of IacaValue* pointers */
-  GPtrArray *ld_valstack;
   /* Glib array, stack of struct iacajsonstate_st */
-  GArray *ld_statestack;
+  GArray *ld_stack;
 };
 
 /* a Glib GHashTable compatible hash function on items */
@@ -126,68 +125,22 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
 }
 
 static inline struct iacajsonstate_st *
-iaca_json_top_state (struct iacaloader_st *ld)
+iaca_json_state (struct iacaloader_st *ld, unsigned n)
 {
   int ln = 0;
   GArray *sta = 0;
   if (!ld)
     return NULL;
-  sta = ld->ld_statestack;
+  sta = ld->ld_stack;
   if (!sta)
     return NULL;
   ln = sta->len;
-  if (ln <= 0)
+  if (ln <= 0 || n > ln)
     return NULL;
-  return &g_array_index (sta, struct iacajsonstate_st, ln - 1);
+  return &g_array_index (sta, struct iacajsonstate_st, ln - n);
 }
 
-static inline IacaValue *
-iaca_json_top_value (struct iacaloader_st *ld)
-{
-  int ln = 0;
-  GPtrArray *sta = 0;
-  if (!ld)
-    return NULL;
-  sta = ld->ld_valstack;
-  if (!sta)
-    return NULL;
-  ln = sta->len;
-  if (ln <= 0)
-    return NULL;
-  return (IacaValue *) g_ptr_array_index (sta, ln - 1);
-}
-
-#define iaca_json_value_push(Ld,Va) iaca_json_value_push_at(__LINE__,(Ld),(Va))
-static inline void
-iaca_json_value_push_at (int lin, struct iacaloader_st *ld, IacaValue *va)
-{
-  GPtrArray *sta = 0;
-  if (!ld)
-    return;
-  sta = ld->ld_valstack;
-  if (!sta)
-    return;
-  iaca_debug_at (__FILE__, lin, "push value [%d] %p", sta->len, va);
-  g_ptr_array_add (sta, va);
-}
-
-#define iaca_json_value_pop(Ld) iaca_json_value_pop_at(__LINE__,(Ld))
-static inline void
-iaca_json_value_pop_at (int lin, struct iacaloader_st *ld)
-{
-  int ln = 0;
-  GPtrArray *sta = 0;
-  if (!ld)
-    return;
-  sta = ld->ld_valstack;
-  if (!sta)
-    return;
-  ln = sta->len;
-  if (ln <= 0)
-    return;
-  iaca_debug_at (__FILE__, lin, "pop value [%d]", sta->len);
-  g_ptr_array_remove_index (sta, ln - 1);
-}
+#define iaca_json_top_state(Ld) iaca_json_state((Ld),1)
 
 #define iaca_json_state_push(Ld,St) iaca_json_state_push_at(__LINE__,(Ld),(St))
 static inline void
@@ -198,7 +151,7 @@ iaca_json_state_push_at (int lin, struct iacaloader_st *ld,
   struct iacajsonstate_st newst = { 0 };
   if (!ld)
     return;
-  sta = ld->ld_statestack;
+  sta = ld->ld_stack;
   if (!sta)
     return;
   memset (&newst, 0, sizeof (newst));
@@ -216,7 +169,7 @@ iaca_json_state_pop_at (int lin, struct iacaloader_st *ld)
   GArray *sta = 0;
   if (!ld)
     return;
-  sta = ld->ld_statestack;
+  sta = ld->ld_stack;
   if (!sta)
     return;
   ln = sta->len;
@@ -247,30 +200,56 @@ iaca_json_state_add_node_son (struct iacajsonstate_st *topst,
   topst->js_node_arity++;
 }
 
+#define iaca_json_got_value(Ld,Va) iaca_json_got_value_at(__LINE__,(Ld),(Va))
+bool
+iaca_json_got_value_at (int lin, struct iacaloader_st *ld, IacaValue *val)
+{
+  struct iacajsonstate_st *topst = iaca_json_top_state (ld);
+  iaca_debug ("lin %d start topst %p statedepth %d val@ %p", lin, topst,
+	      ld->ld_stack ? ld->ld_stack->len : 0, val);
+  if (!topst)
+    {
+      iaca_debug ("empty stack fail");
+      return false;
+    }
+  iaca_debug ("top state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
+    {
+    case IACAJS_WAITNODESONS:
+      iaca_json_state_add_node_son (topst, val);
+      iaca_debug ("added son @ %p", val);
+      return true;
+    default:
+      iaca_debug ("fail");
+      return false;
+    }
+}
+
 /* various YAJL handlers for loading JSON */
 
-#warning unimplemented YAJL handlers return 0
 static int
 iacaloadyajl_null (void *ctx)
 {
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s]", (int) topst->js_state,
 	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
   switch (topst->js_state)
     {
-    case IACAJS_FRESHVAL:
-      iaca_json_state_pop (ld);
-      iaca_json_value_push (ld, NULL);
+    case IACAJS_WAITVAL:
+      topst->js_val = NULL;
+      topst->js_state = IACAJS_GOTVAL;
+      iaca_debug ("got null");
       return 1;
     default:
+      iaca_debug ("fail");
       return 0;
     }
-  return 0;
 }
 
 static int
@@ -279,11 +258,12 @@ iacaloadyajl_boolean (void *ctx, int b)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
-  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+  iaca_debug (" state #%d [%s]", (int) topst->js_state,
 	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  iaca_debug ("fail");
   return 0;
 }
 
@@ -295,7 +275,7 @@ iacaloadyajl_number (void *ctx, const char *s, unsigned slen)
   long long ll = 0;
   char *end = 0;
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   ll = strtoll (s, &end, 0);
@@ -303,23 +283,14 @@ iacaloadyajl_number (void *ctx, const char *s, unsigned slen)
 	      iacajs_state_names[topst->js_state % IACAJS__LAST], ll);
   switch (topst->js_state)
     {
-    case IACAJS_WAITITEMID:
-      {
-	IacaItem *itm = iaca_retrieve_loaded_item (ld, ll);
-	if (!itm)
-	  return 0;
-	iaca_debug ("item #%lld %p", ll, itm);
-	iaca_json_value_push (ld, (IacaValue *) itm);
-	topst->js_state = IACAJS_DONEVAL;
-	return 1;
-      }
     case IACAJS_WAITNODECONN:
       {
 	IacaItem *itm = iaca_retrieve_loaded_item (ld, ll);
-	if (!itm)
-	  return 0;
 	if (topst->js_node_conn)
-	  return 0;
+	  {
+	    iaca_debug ("fail already got conn");
+	    return 0;
+	  }
 	iaca_debug ("connective item #%lld %p", ll, itm);
 	topst->js_node_conn = itm;
 	topst->js_state = IACAJS_WAITNODESONS;
@@ -327,11 +298,22 @@ iacaloadyajl_number (void *ctx, const char *s, unsigned slen)
       }
     case IACAJS_WAITINTVAL:
       {
-	topst->js_num = (long) ll;
-	iaca_debug ("intval %ld", topst->js_num);
+	IacaValue *ival = iacav_integer_make (ll);
+	iaca_debug ("got ival @ %p %ld", ival, (long) ll);
+	topst->js_state = IACAJS_GOTVAL;
+	topst->js_val = ival;
+	return 1;
+      }
+    case IACAJS_WAITITEMID:
+      {
+	IacaItem *itm = iaca_retrieve_loaded_item (ld, ll);
+	iaca_debug ("got itm val %p #%lld", itm, ll);
+	topst->js_state = IACAJS_GOTVAL;
+	topst->js_val = (IacaValue *) itm;
 	return 1;
       }
     default:
+      iaca_debug ("fail");
       return 0;
     }
   return 0;
@@ -344,22 +326,24 @@ iacaloadyajl_string (void *ctx, const unsigned char *str, unsigned slen)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s] str %.*s", (int) topst->js_state,
 	      iacajs_state_names[topst->js_state % IACAJS__LAST], slen, str);
   switch (topst->js_state)
     {
-    case IACAJS_WAITVALKIND:
+    case IACAJS_WAITKIND:
       if (!strncmp ("itrv", (const char *) str, slen))
 	{
 	  topst->js_state = IACAJS_WAITITEMID;
+	  iaca_debug ("waititemid");
 	  return 1;
 	}
       if (!strncmp ("intv", (const char *) str, slen))
 	{
 	  topst->js_state = IACAJS_WAITINTVAL;
+	  iaca_debug ("waitintval");
 	  return 1;
 	}
       else if (!strncmp ("nodv", (const char *) str, slen))
@@ -369,13 +353,13 @@ iacaloadyajl_string (void *ctx, const unsigned char *str, unsigned slen)
 	  topst->js_node_sons = 0;
 	  topst->js_node_arity = 0;
 	  topst->js_node_sizesons = 0;
+	  iaca_debug ("waitnodeconn");
 	  return 1;
 	}
-      break;
     default:
+      iaca_debug ("fail");
       return 0;
     }
-  return 0;
 }
 
 static int
@@ -384,7 +368,7 @@ iacaloadyajl_map_key (void *ctx, const unsigned char *str, unsigned int slen)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s] key %.*s",
@@ -392,28 +376,45 @@ iacaloadyajl_map_key (void *ctx, const unsigned char *str, unsigned int slen)
 	      iacajs_state_names[topst->js_state % IACAJS__LAST], slen, str);
   switch (topst->js_state)
     {
-    case IACAJS_WAITVALKIND:
+    case IACAJS_WAITKIND:
       if (!strncmp ("kd", (const char *) str, slen))
-	return 1;
+	{
+	  iaca_debug ("got kd");
+	  return 1;
+	}
       break;
     case IACAJS_WAITITEMID:
       if (!strncmp ("id", (const char *) str, slen))
-	return 1;
+	{
+	  iaca_debug ("got id");
+	  return 1;
+	}
+      break;
     case IACAJS_WAITNODECONN:
       if (!strncmp ("conid", (const char *) str, slen))
-	return 1;
+	{
+	  iaca_debug ("got conid");
+	  return 1;
+	}
       break;
     case IACAJS_WAITNODESONS:
       if (!strncmp ("sons", (const char *) str, slen))
-	return 1;
+	{
+	  iaca_debug ("got sons");
+	  return 1;
+	}
       break;
     case IACAJS_WAITINTVAL:
       if (!strncmp ("int", (const char *) str, slen))
-	return 1;
+	{
+	  iaca_debug ("got int");
+	  return 1;
+	}
       break;
     default:
-      return 0;
+      break;
     }
+  iaca_debug ("fail");
   return 0;
 }
 
@@ -424,71 +425,79 @@ iacaloadyajl_start_map (void *ctx)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s]", (int) topst->js_state,
 	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
   switch (topst->js_state)
     {
-    case IACAJS_FRESHVAL:
-      iaca_json_state_push (ld, IACAJS_WAITVALKIND);
+    case IACAJS_WAITVAL:
+      iaca_debug ("waiting kind");
+      topst->js_state = IACAJS_WAITKIND;
       return 1;
     case IACAJS_WAITNODESONS:
-      iaca_json_state_push (ld, IACAJS_WAITVALKIND);
+      iaca_json_state_push (ld, IACAJS_WAITKIND);
+      iaca_debug ("waiting kind for son");
       return 1;
     default:
+      iaca_debug ("fail");
       return 0;
     }
-  return 0;
 }
 
 static int
 iacaloadyajl_end_map (void *ctx)
 {
-  int nbloop = 0;
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
-  while ((topst = iaca_json_top_state (ld)) != 0)
+  iaca_debug ("state #%d [%s]", (int) topst->js_state,
+	      iacajs_state_names[topst->js_state % IACAJS__LAST]);
+  switch (topst->js_state)
     {
-      nbloop++;
-      iaca_debug ("state #%d [%s] loop #%d", (int) topst->js_state,
-		  iacajs_state_names[topst->js_state % IACAJS__LAST], nbloop);
-      switch (topst->js_state)
-	{
-	case IACAJS_DONEVAL:
-	  iaca_json_state_pop (ld);
-	  iaca_debug ("done val");
-	  return 1;		//continue
-	case IACAJS_WAITINTVAL:
+    case IACAJS_GOTVAL:
+      {
+	IacaValue *val = topst->js_val;
+	iaca_debug ("got val %p", val);
+	iaca_json_state_pop (ld);
+	topst = iaca_json_top_state (ld);
+	if (!topst)
 	  {
-	    IacaValue *val = iacav_integer_make (topst->js_num);
-	    iaca_debug ("made int val %ld @%p", topst->js_num, val);
-	    iaca_json_value_push (ld, val);
-	    iaca_json_state_pop (ld);
-	    return 1;		//continue;
+	    iaca_debug ("fail empty stack");
+	    return 0;
 	  }
-	case IACAJS_WAITNODESONS:
+	iaca_debug ("now top state #%d [%s]", (int) topst->js_state,
+		    iacajs_state_names[topst->js_state % IACAJS__LAST]);
+	if (!iaca_json_got_value (ld, val))
 	  {
-	    IacaValue *val = 0;
-	    val = iaca_json_top_value (ld);
-	    iaca_debug ("son #%d %p", topst->js_node_arity, val);
-	    iaca_json_value_pop (ld);
-	    iaca_json_state_add_node_son (topst, val);
-	    return 1;
-	  }
-	default:
-	  return 0;
-	}
+	    iaca_debug ("fail got val");
+	    return 0;
+	  };
+	iaca_debug ("done val %p", val);
+	return 1;
+      }
+    case IACAJS_WAITINTVAL:
+      {
+	IacaValue *val = iacav_integer_make (topst->js_num);
+	iaca_debug ("made int val %ld @%p", topst->js_num, val);
+	return 1;
+      }
+    case IACAJS_WAITNODESONS:
+      {
+	IacaValue *val = 0;
+	val = topst->js_val;
+	iaca_debug ("son #%d %p", topst->js_node_arity, val);
+	iaca_json_state_add_node_son (topst, val);
+	return 1;
+      }
+    default:
+      iaca_debug ("fail");
+      return 0;
     }
-  if (!topst)
-    return 1;
-  else
-    return 0;
 }
 
 
@@ -498,7 +507,7 @@ iacaloadyajl_start_array (void *ctx)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s]", (int) topst->js_state,
@@ -515,7 +524,7 @@ iacaloadyajl_start_array (void *ctx)
       topst->js_node_sizesons = 4;
       topst->js_node_sons =
 	iaca_alloc_data (sizeof (IacaValue *) * topst->js_node_sizesons);
-      iaca_json_state_push (ld, IACAJS_FRESHVAL);
+      iaca_json_state_push (ld, IACAJS_WAITVAL);
       return 1;
     default:
       return 0;
@@ -529,7 +538,7 @@ iacaloadyajl_end_array (void *ctx)
   struct iacaloader_st *ld = ctx;
   struct iacajsonstate_st *topst = iaca_json_top_state (ld);
   iaca_debug ("start topst %p statedepth %d", topst,
-	      ld->ld_statestack ? ld->ld_statestack->len : 0);
+	      ld->ld_stack ? ld->ld_stack->len : 0);
   if (!topst)
     return 0;
   iaca_debug ("state #%d [%s]", (int) topst->js_state,
@@ -547,9 +556,9 @@ iacaloadyajl_end_array (void *ctx)
 	topst->js_node_sons = 0;
 	topst->js_node_arity = topst->js_node_sizesons = 0;
 	topst->js_node_conn = 0;
-	iaca_json_state_pop (ld);
-	iaca_json_value_push (ld, newnod);
-	iaca_debug ("ok");
+	topst->js_val = newnod;
+	topst->js_state = IACAJS_GOTVAL;
+	iaca_debug ("gotval newnod %p ok", newnod);
 	return 1;
       }
     default:
@@ -619,12 +628,10 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath)
   ld->ld_json =
     yajl_alloc (&iacaloadyajl_callbacks, &iaca_yajl_parserconf,
 		&iaca_yajl_alloc_functions, ld);
-  ld->ld_valstack = g_ptr_array_new ();
-  ld->ld_statestack =
-    g_array_new (TRUE, TRUE, sizeof (struct iacajsonstate_st));
+  ld->ld_stack = g_array_new (TRUE, TRUE, sizeof (struct iacajsonstate_st));
   linsz = 256;
   line = calloc (linsz, 1);
-  iaca_json_state_push (ld, IACAJS_FRESHVAL);
+  iaca_json_state_push (ld, IACAJS_WAITVAL);
   while (!feof (datafil))
     {
       ssize_t linlen = getline (&line, &linsz, datafil);
@@ -644,10 +651,8 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath)
   fclose (datafil);
   free (line);
   yajl_free (ld->ld_json);
-  g_ptr_array_free (ld->ld_valstack, TRUE);
-  ld->ld_valstack = 0;
-  g_array_free (ld->ld_statestack, TRUE);
-  ld->ld_statestack = 0;
+  g_array_free (ld->ld_stack, TRUE);
+  ld->ld_stack = 0;
   ld->ld_json = 0;
   iaca_debug ("successfully loaded data file %s", datapath);
 }
