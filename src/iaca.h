@@ -38,10 +38,8 @@
 #include <sys/types.h>
 
 
-// YAJL include for JSON
-#include <yajl/yajl_common.h>
-#include <yajl/yajl_parse.h>
-#include <yajl/yajl_gen.h>
+// JANSSON include for JSON - see http://www.digip.org/jansson/
+#include <jansson.h>
 
 // GTK include for graphical interface
 #include <gtk/gtk.h>

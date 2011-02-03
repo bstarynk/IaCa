@@ -1,5 +1,5 @@
-// file cold.json
 {
+  "iacaversion" : "2011A", 
   "kd": "nodv",
   "conid": 1,
   "sons": [

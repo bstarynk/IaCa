@@ -22,7 +22,7 @@ CFLAGS= $(OPTIMFLAGS) $(PREPROFLAGS)
 OPTIMFLAGS= -Wall -O -g -std=gnu99
 PREPROFLAGS= -D_GNU_SOURCE -I src -I /usr/local/include \
 	$(shell pkg-config --cflags $(PACKAGES))
-LIBES= -L /usr/local/lib -lyajl $(shell pkg-config --libs $(PACKAGES))  -lgc -lrt -lm
+LIBES= -L /usr/local/lib -ljansson $(shell pkg-config --libs $(PACKAGES))  -lgc -lrt -lm
 SOURCEFILES=$(wildcard src/*.c)
 OBJECTFILES=$(patsubst %.c,%.o,$(SOURCEFILES))
 .PHONY: all clean indent
