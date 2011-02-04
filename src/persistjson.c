@@ -81,7 +81,8 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
 }
 
 static void
-iaca_load_data (struct iacaloader_st *ld, const char *datapath)
+iaca_load_data (struct iacaloader_st *ld, const char *datapath,
+		const char *spacename)
 {
   const char *verstr = 0;
   json_error_t jerr;
@@ -101,6 +102,9 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath)
       ("JSON root with iacaversion %s but expecting %s in data file %s",
        verstr, IACA_JSON_VERSION, datapath);
 #warning incomplete iaca_load_data
+  /* free the JSON object */
+  json_decref (ld->ld_root);
+  ld->ld_root = 0;
 }
 
 void
@@ -149,7 +153,7 @@ iaca_load (const char *dirpath)
 	  iaca_debug ("datapath '%s'", datapath);
 	  if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
 	    iaca_error ("data file %s does not exist", datapath);
-	  iaca_load_data (&ld, datapath);
+	  iaca_load_data (&ld, datapath, name);
 	}
     }
 }

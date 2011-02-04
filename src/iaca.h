@@ -733,7 +733,16 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 
 #define IACA_MANIFEST_FILE "IaCa_Manifest"
 
+/* dataspaces are not garbage collected! */
+struct iacaspace_st
+{
+  /* GC-ed space name */
+  IacaString *sp_name;
+};
+
+/* hashtable of modules */
 GHashTable *iaca_module_htab;
+/* hashtable of data spaces */
 GHashTable *iaca_data_htab;
 void iaca_load (const char *);
 #endif /*IACA_INCLUDED */
