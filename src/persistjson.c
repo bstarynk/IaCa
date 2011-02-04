@@ -107,6 +107,97 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath,
   ld->ld_root = 0;
 }
 
+
+
+
+const char *
+iaca_load_module (const char *dirpath, const char *modname)
+{
+  gchar *modulepath = 0;
+  gchar *moduledirpath = 0;
+  GModule *module = 0;
+  iaca_debug ("dirpath '%s' modname '%s'", dirpath, modname);
+  if (!dirpath || !dirpath[0])
+    return GC_STRDUP ("emptyy dirpath to load module");
+  if (!modname || !modname[0])
+    return GC_STRDUP ("empty modname to load module");
+  // check that modules are supported
+  if (!g_module_supported ())
+    return GC_STRDUP ("modules are not supported");
+  // check validity of dirpath
+  if (!g_file_test (dirpath, G_FILE_TEST_IS_DIR))
+    {
+      char *msg =
+	g_strdup_printf ("when loading module dirpath %s is not a directory",
+			 dirpath);
+      const char *err = GC_STRDUP (msg);
+      g_free (msg);
+      return err;
+    }
+  // check validity of modname
+  for (const char *pc = modname; *pc; pc++)
+    if (!g_ascii_isalnum (*pc) && *pc != '_')
+      {
+	char *msg =
+	  g_strdup_printf
+	  ("when loading module invalid character in module name %s",
+	   modname);
+	const char *err = GC_STRDUP (msg);
+	g_free (msg);
+	return err;
+      };
+  //
+  module = g_hash_table_lookup (iaca_module_htab, modname);
+  if (module)
+    {
+      char *msg = g_strdup_printf ("module %s already loaded as %s", modname,
+				   g_module_name (module));
+      const char *err = GC_STRDUP (msg);
+      g_free (msg);
+      return err;
+    }
+  // look for the module in the src/ subdirectory
+  if (!module)
+    {				/* always true here */
+      moduledirpath = g_build_filename (dirpath, "src", NULL);
+      if (g_file_test (moduledirpath, G_FILE_TEST_IS_DIR))
+	{
+	  modulepath = g_module_build_path (moduledirpath, modname);
+	  module = g_module_open (modulepath, 0);
+	}
+      g_free (moduledirpath);
+      moduledirpath = 0;
+    }
+  // look for the module in the module/ subdirectory
+  if (!module)
+    {				/* true if module not found */
+      moduledirpath = g_build_filename (dirpath, "module", NULL);
+      if (g_file_test (moduledirpath, G_FILE_TEST_IS_DIR))
+	{
+	  modulepath = g_module_build_path (moduledirpath, modname);
+	  module = g_module_open (modulepath, 0);
+	}
+      g_free (moduledirpath);
+      moduledirpath = 0;
+    }
+  if (!module)
+    {
+      char *msg
+	=
+	g_strdup_printf
+	("failed to load module %s in src/ or module/ of %s: %s",
+	 modname, dirpath, g_module_error ());
+      const char *err = GC_STRDUP (msg);
+      g_free (msg);
+      return err;
+    }
+  // the module is resident, we never really g_module_close it!
+  g_module_make_resident (module);
+  g_hash_table_insert (iaca_module_htab, (gpointer) modname,
+		       (gpointer) module);
+  return NULL;
+}
+
 void
 iaca_load (const char *dirpath)
 {
@@ -136,12 +227,11 @@ iaca_load (const char *dirpath)
 	continue;
       if (sscanf (line, " IACAMODULE %ms", &name))
 	{
+	  const char *errstr = 0;
 	  iaca_debug ("module '%s'", name);
-	  GModule *mod = g_module_open (name, 0);
-	  if (!mod)
-	    iaca_error ("failed to load module '%s' - %s",
-			name, g_module_error ());
-	  g_hash_table_insert (iaca_module_htab, g_strdup (name), mod);
+	  errstr = iaca_load_module (dirpath, name);
+	  if (errstr)
+	    iaca_error ("failed to load module '%s' - %s", name, errstr);
 	}
       else if (sscanf (line, " IACADATA %ms", &name))
 	{

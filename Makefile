@@ -15,7 +15,7 @@
 ##   along with IaCa.  If not, see <http://www.gnu.org/licenses/>.
 
 ## the pkg-config list of required packages
-PACKAGES=gtk+-3.0
+PACKAGES=gtk+-3.0 gmodule-2.0
 CC=gcc
 INDENT=indent
 CFLAGS= $(OPTIMFLAGS) $(PREPROFLAGS)

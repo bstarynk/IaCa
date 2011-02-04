@@ -41,6 +41,12 @@
 // JANSSON include for JSON - see http://www.digip.org/jansson/
 #include <jansson.h>
 
+// include Glib printf utilities
+#include <glib/gprintf.h>
+
+// include Glib module facilities
+#include <gmodule.h>
+
 // GTK include for graphical interface
 #include <gtk/gtk.h>
 
@@ -745,4 +751,9 @@ GHashTable *iaca_module_htab;
 /* hashtable of data spaces */
 GHashTable *iaca_data_htab;
 void iaca_load (const char *);
+
+/* load a [binary] module of a given name which should contain only
+   letters from A-Z a-z, digits 0-9 or underscore _. Returns NULL on
+   success, or a GC_strdup-ed error string on failure. */
+const char *iaca_load_module (const char *dirpath, const char *modnam);
 #endif /*IACA_INCLUDED */
