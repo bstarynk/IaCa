@@ -65,6 +65,16 @@ iaca_node_makevarf (IacaValue *conn, ...)
 }
 
 
+IacaSet *
+iaca_set_make (IacaValue *parentset, IacaValue *elemtab[], unsigned card)
+{
+  IacaSet *newset = 0;
+  unsigned newcard = 0;
+  if (parentset && parentset->v_kind != IACAV_SET)
+    parentset = NULL;
+#warning iaca_set_make incomplete
+  iaca_error ("iaca_set_make unimplemented");
+}
 
 IacaItem *
 iaca_item_make (void)

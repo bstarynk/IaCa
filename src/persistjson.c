@@ -29,6 +29,12 @@ struct iacaloader_st
   GHashTable *ld_itemhtab;
   /* JANSSON root Json object for a given data file. */
   json_t *ld_root;
+  /* to setjmp on error */
+  jmp_buf ld_errjmp;
+  /* the associated error message GC_strdup-ed */
+  const char *ld_errstr;
+  /* the originating error line */
+  int ld_errline;
 };
 
 
@@ -80,6 +86,115 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   return itm;
 }
 
+static void iaca_json_error_printf_at (int ln, struct iacaloader_st *ld,
+				       const char *fmt, ...)
+  __attribute__ ((format (printf, 3, 4), noreturn));
+#define iaca_json_error_printf(Ld,Fmt,...) \
+  iaca_json_error_printf_at(__LINE__,(Ld),(Fmt),##__VA_ARGS__)
+void
+iaca_json_error_printf_at (int lin, struct iacaloader_st *ld, const char *fmt,
+			   ...)
+{
+  const char *msg = 0;
+  va_list args;
+  va_start (args, fmt);
+  msg = g_strdup_vprintf (fmt, args);
+  va_end (args);
+  ld->ld_errstr = GC_STRDUP (msg);
+  g_free ((gpointer) msg);
+  msg = 0;
+  ld->ld_errline = lin;
+  longjmp (ld->ld_errjmp, 1);
+}
+
+
+IacaValue *
+iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
+{
+  IacaValue *res = 0;
+  int ty = 0;
+  if (!ld)
+    iaca_error ("null ld");
+  if (!js)
+    iaca_json_error_printf (ld, "null json pointer");
+  ty = json_typeof (js);
+  switch (ty)
+    {
+    case JSON_NULL:
+      return NULL;
+    case JSON_INTEGER:
+      return iacav_integer_make (json_integer_value (js));
+    case JSON_STRING:
+      return iacav_string_make (json_string_value (js));
+    case JSON_OBJECT:
+      {
+	const char *kdstr = json_string_value (json_object_get (js, "kd"));
+	if (!kdstr)
+	  iaca_json_error_printf (ld, "missing 'kd' in object");
+	else if (!strcmp (kdstr, "strv"))
+	  {
+	    const char *s = json_string_value (json_object_get (js, "str"));
+	    if (s)
+	      return iacav_string_make (s);
+	    iaca_json_error_printf (ld, "missing 'str' in object for string");
+	  }
+	else if (!strcmp (kdstr, "nodv"))
+	  {
+	    long long conid =
+	      json_integer_value (json_object_get (js, "conid"));
+	    IacaItem *conitm = 0;
+	    json_t *sonjs = 0;
+	    int arity = 0;
+	    IacaNode *nd = 0;
+	    if (conid <= 0)
+	      iaca_json_error_printf (ld,
+				      "invalid or missing 'conid' in object for node");
+	    sonjs = json_object_get (js, "sons");
+	    if (!json_is_array (sonjs))
+	      iaca_json_error_printf (ld, "bad 'sons' in object for node");
+	    arity = json_array_size (sonjs);
+	    conitm = iaca_retrieve_loaded_item (ld, conid);
+	    nd = iaca_node_make ((IacaValue *) conitm, 0, arity);
+	    for (int i = 0; i < arity; i++)
+	      nd->v_sons[i] =
+		iaca_json_to_value (ld, json_array_get (sonjs, i));
+	    return (IacaValue *) nd;
+	  }
+	else if (!strcmp (kdstr, "setv"))
+	  {
+	    json_t *elemjs = 0;
+	    int card = 0;
+	    IacaValue **elemtab = 0;
+	    elemjs = json_object_get (js, "elemids");
+	    if (!json_is_array (elemjs))
+	      iaca_json_error_printf (ld, "bad 'elemids' in object for set");
+	    card = json_array_size (elemjs);
+	    elemtab = iaca_alloc_data (sizeof (IacaItem *) * card);
+	    for (int i = 0; i < card; i++)
+	      {
+		json_t *curelemjs = json_array_get (elemjs, i);
+		long long curelemid = 0;
+		elemtab[i] = NULL;
+		if (!json_is_integer (curelemjs))
+		  iaca_json_error_printf (ld,
+					  "element #%d in object for set not integer",
+					  i);
+		curelemid = json_integer_value (curelemjs);
+		elemtab[i] =
+		  (IacaValue *) iaca_retrieve_loaded_item (ld, curelemid);
+	      }
+	    res = (IacaValue *) iaca_set_make (NULL, elemtab, card);
+	    GC_free (elemtab);
+	    return res;
+	  }
+      }
+      break;
+    default:
+      iaca_json_error_printf (ld, "unexepected json type #%d", ty);
+    }
+  return res;
+}
+
 static void
 iaca_load_data (struct iacaloader_st *ld, const char *datapath,
 		const char *spacename)
@@ -101,6 +216,7 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath,
     iaca_error
       ("JSON root with iacaversion %s but expecting %s in data file %s",
        verstr, IACA_JSON_VERSION, datapath);
+
 #warning incomplete iaca_load_data
   /* free the JSON object */
   json_decref (ld->ld_root);

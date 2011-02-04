@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <setjmp.h>
 
 /// system includes
 #include <dlfcn.h>
@@ -164,7 +165,7 @@ struct iacastring_st
 // allocator of a string; return null if invalid
 static inline IacaString *iaca_string_make (const gchar *s);
 
-#define iacav_string_make(L) ((IacaString*)iaca_integer_make((L)))
+#define iacav_string_make(L) ((IacaValue*)iaca_string_make((L)))
 
 // safe accessor with default
 static inline const gchar *iaca_string_val_def (IacaValue *v,
@@ -231,7 +232,7 @@ static inline IacaNode *iacac_node (IacaValue *v);
 
 /***************** SET VALUES ****************/
 /*** JSON:
-     { "kd" : "setv" ,  "elem" : [ <element-ids...> ] } 
+     { "kd" : "setv" ,  "elemids" : [ <element-ids...> ] } 
 ***/
 
 
@@ -246,15 +247,15 @@ struct iacaset_st
 };
 
 // allocator of a set with a parent set and an  array of item elements.
-extern IacaNode *iaca_set_make (IacaValue *parentset, IacaValue *elemtab[],
-				unsigned arity);
+extern IacaSet *iaca_set_make (IacaValue *parentset, IacaValue *elemtab[],
+			       unsigned card);
 // variadic allocator of a set with its parent and elements, null terminated
-extern IacaNode *iaca_set_makevarf (IacaValue *parentset, ...)
+extern IacaSet *iaca_set_makevarf (IacaValue *parentset, ...)
   __attribute__ ((sentinel));
 #define iaca_set_makevar(Par,...) \
-  iaca_node_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)
+  iaca_set_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)
 #define iaca_set_makenewvar(...) \
-  iaca_node_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
+  iaca_set_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
 
 static inline int iaca_set_cardinal_def (IacaValue *v, int def);
 
