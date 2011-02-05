@@ -138,6 +138,14 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 	      return iacav_string_make (s);
 	    iaca_json_error_printf (ld, "missing 'str' in object for string");
 	  }
+	else if (!strcmp (kdstr, "intv"))
+	  {
+	    json_t *intjs = json_object_get (js, "int");
+	    if (json_is_integer (intjs))
+	      return iacav_integer_make (json_integer_value (intjs));
+	    iaca_json_error_printf (ld,
+				    "missing 'int' in object for integer");
+	  }
 	else if (!strcmp (kdstr, "nodv"))
 	  {
 	    long long conid =
@@ -187,6 +195,18 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 	    GC_free (elemtab);
 	    return res;
 	  }
+	else if (!strcmp (kdstr, "itrv"))
+	  {
+	    long long id = json_integer_value (json_object_get (js, "id"));
+	    if (id > 0)
+	      return (IacaValue *) iaca_retrieve_loaded_item (ld, id);
+	    else
+	      iaca_json_error_printf (ld,
+				      "bad or missing id %lld in object for item reference",
+				      id);
+	  }
+	else
+	  iaca_json_error_printf (ld, "bad kind string %s in object", kdstr);
       }
       break;
     default:
