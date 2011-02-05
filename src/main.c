@@ -84,6 +84,10 @@ iaca_itemptr_compare (const void *p1, const void *p2)
     return 1;
 }
 
+/* we allocate on stack intermediate space for small sets, otherwise in heap */
+#define IACA_QUICK_MAX_CARDINAL 8
+
+
 IacaSet *
 iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
 {
@@ -93,7 +97,6 @@ iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
   IacaItem **newitems = 0;
   unsigned nbelems = 0;
   unsigned parix = 0, parsiz = 0, newix = 0, cnt = 0;
-#define IACA_QUICK_MAX_CARDINAL 8
   IacaItem *quitems[IACA_QUICK_MAX_CARDINAL] = { 0 };
   if (!parent || parent->v_kind != IACAV_SET)
     parentset = NULL;
@@ -198,6 +201,45 @@ iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
   newset->v_cardinal = cnt;
   return newset;
 }
+
+IacaSet *
+iaca_set_makevarf (IacaValue *parent, ...)
+{
+  IacaSet *newset = 0;
+  unsigned cnt = 0;
+  IacaValue *quvals[IACA_QUICK_MAX_CARDINAL] = { 0 };
+  IacaSet *parentset = 0;
+  IacaValue *curval = 0;
+  IacaValue **vals = 0;
+  va_list args;
+  if (!parent || parent->v_kind != IACAV_SET)
+    parentset = NULL;
+  else
+    parentset = (IacaSet *) parent;
+  va_start (args, parent);
+  while ((curval = va_arg (args, IacaValue *)) != 0)
+    {
+      if (cnt < IACA_QUICK_MAX_CARDINAL)
+	quvals[cnt] = curval;
+      cnt++;
+    }
+  va_end (args);
+  if (cnt < IACA_QUICK_MAX_CARDINAL)
+    newset = iaca_set_make ((IacaValue *) parentset, quvals, cnt);
+  else
+    {
+      vals = iaca_alloc_data (cnt * sizeof (IacaValue *));
+      cnt = 0;
+      va_start (args, parent);
+      while ((curval = va_arg (args, IacaValue *)) != 0)
+	  vals[cnt++] = curval;
+      va_end (args);
+      newset = iaca_set_make ((IacaValue *) parentset, vals, cnt);
+      GC_FREE (vals);
+    }
+  return newset;
+}
+
 
 IacaItem *
 iaca_item_make (void)
