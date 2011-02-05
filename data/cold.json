@@ -1,15 +1,3 @@
 {
   "iacaversion" : "2011A", 
-  "kd": "nodv",
-  "conid": 1,
-  "sons": [
-    {
-      "kd": "intv",
-      "int": 12
-    },
-    {
-      "kd": "itrv",
-      "id": 1
-    }
-  ]
 }

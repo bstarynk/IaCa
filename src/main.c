@@ -498,9 +498,10 @@ iaca_set_symetric_difference (IacaValue *v1, IacaValue *v2)
 
 ////////////////////////////////////////////////////////////////
 IacaItem *
-iaca_item_make (void)
+iaca_item_make (struct iacadataspace_st *sp)
 {
   IacaItem *itm = 0;
+  g_assert (sp == NULL || sp->dsp_magic == IACA_SPACE_MAGIC);
   iaca_item_last_ident++;
   itm = iaca_alloc_data (sizeof (IacaItem));
   itm->v_kind = IACAV_ITEM;
@@ -509,6 +510,7 @@ iaca_item_make (void)
   itm->v_payloadkind = IACAPAYLOAD__NONE;
   itm->v_payloadptr = NULL;
   itm->v_itemcontent = NULL;
+  itm->v_dataspace = sp;
   return itm;
 }
 
@@ -717,6 +719,34 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
   if (tbl->at_size > 10 && tbl->at_count < tbl->at_size / 5)
     iaca_item_attribute_reorganize (vitem, 0);
   return oldval;
+}
+
+
+/* get a dataspace by its name; dataspaces are never freed */
+struct iacadataspace_st *
+iaca_dataspace (const char *name)
+{
+  struct iacadataspace_st *dsp = 0;
+  if (!name || !name[0])
+    return NULL;
+  for (const char *pc = name; *pc; pc++)
+    if (!g_ascii_isalnum (*pc) && *pc != '_')
+      return NULL;
+  if (!iaca_dataspace_htab)
+    iaca_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  dsp = g_hash_table_lookup (iaca_dataspace_htab, name);
+  if (!dsp)
+    {
+      IacaString *strn = iaca_string_make (name);
+      dsp = g_malloc0 (sizeof (*dsp));
+      dsp->dsp_name = strn;
+      dsp->dsp_magic = IACA_SPACE_MAGIC;
+      g_hash_table_insert (iaca_dataspace_htab,
+			   (gpointer) iaca_string_val ((IacaValue *) strn),
+			   dsp);
+    }
+  g_assert (dsp->dsp_magic == IACA_SPACE_MAGIC);
+  return dsp;
 }
 
 int

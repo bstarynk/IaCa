@@ -319,6 +319,8 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
     "attr" : [ <item-attribute...> ] ,
     "payload" : <item-payload> 
   }
+  
+  
 
 ***/
 
@@ -350,8 +352,8 @@ struct iacaitem_st
   struct iacatabattr_st *v_attrtab;	/* the hash table of attribute
 					   entries */
   IacaValue *v_itemcontent;	/* the mutable item content */
-  struct iacaspace_st *v_space;	/* the item space defines where it is
-				   persisted */
+  struct iacadataspace_st *v_dataspace;	/* the item data space defines where it is
+					   persisted */
   /* anonymous union of pointers for payload. Change simultanously the
      v_payloadkind. */
   union
@@ -365,8 +367,8 @@ struct iacaitem_st
 int64_t iaca_item_last_ident;
 
 /* make an item */
-extern IacaItem *iaca_item_make (void);
-#define iacav_item_make() ((IacaValue*) iaca_item_make())
+extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
+#define iacav_item_make(Sp) ((IacaValue*) iaca_item_make((Sp)))
 
 struct iacaentryattr_st
 {
@@ -775,17 +777,22 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 
 #define IACA_MANIFEST_FILE "IaCa_Manifest"
 
+#define IACA_SPACE_MAGIC 0x67467f0b	/*1732673291 */
 /* dataspaces are not garbage collected! */
-struct iacaspace_st
+struct iacadataspace_st
 {
+  unsigned dsp_magic;		/* always IACA_SPACE_MAGIC */
   /* GC-ed space name */
-  IacaString *sp_name;
+  IacaString *dsp_name;
 };
 
 /* hashtable of modules */
 GHashTable *iaca_module_htab;
 /* hashtable of data spaces */
-GHashTable *iaca_data_htab;
+GHashTable *iaca_dataspace_htab;
+
+struct iacadataspace_st *iaca_dataspace (const char *name);
+
 void iaca_load (const char *);
 
 /* load a [binary] module of a given name which should contain only

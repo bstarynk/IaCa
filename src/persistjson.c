@@ -35,6 +35,8 @@ struct iacaloader_st
   const char *ld_errstr;
   /* the originating error line */
   int ld_errline;
+  /* current dataspace */
+  struct iacadataspace_st *ld_dataspace;
 };
 
 
@@ -76,6 +78,7 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   itm = iaca_alloc_data (sizeof (IacaItem));
   itm->v_kind = IACAV_ITEM;
   itm->v_ident = id;
+  itm->v_dataspace = ld->ld_dataspace;
   if (iaca_item_last_ident < id)
     iaca_item_last_ident = id;
   itm->v_attrtab = NULL;
@@ -216,12 +219,22 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 }
 
 static void
+iaca_load_item_content (struct iacaloader_st *ld, json_t * js)
+{
+  iaca_error ("iaca_load_item_content unimplemented");
+#warning iaca_load_item_content not implemented
+}
+
+static void
 iaca_load_data (struct iacaloader_st *ld, const char *datapath,
 		const char *spacename)
 {
   const char *verstr = 0;
   json_error_t jerr;
+  json_t *jsitarr = 0;
+  size_t nbit = 0;
   memset (&jerr, 0, sizeof (jerr));
+  ld->ld_dataspace = iaca_dataspace (spacename);
   ld->ld_root = json_load_file (datapath, 0, &jerr);
   if (!ld->ld_root)
     iaca_error ("failed to load data file %s: JSON error line %d: %s",
@@ -236,11 +249,19 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath,
     iaca_error
       ("JSON root with iacaversion %s but expecting %s in data file %s",
        verstr, IACA_JSON_VERSION, datapath);
-
-#warning incomplete iaca_load_data
+  jsitarr = json_object_get (ld->ld_root, "itemcont");
+  if (!json_is_array (jsitarr))
+    iaca_error ("JSON root without itemcont in data file %s", datapath);
+  nbit = json_array_size (jsitarr);
+  for (int ix = 0; ix < nbit; ix++)
+    {
+      json_t *jscurit = json_array_get (jsitarr, ix);
+      iaca_load_item_content (ld, jscurit);
+    }
   /* free the JSON object */
   json_decref (ld->ld_root);
   ld->ld_root = 0;
+  ld->ld_dataspace = NULL;
 }
 
 
@@ -352,8 +373,10 @@ iaca_load (const char *dirpath)
     iaca_error ("failed to open manifest file %s - %m", manipath);
   siz = 80;
   line = calloc (siz, 1);
-  iaca_module_htab = g_hash_table_new (g_str_hash, g_str_equal);
-  iaca_data_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  if (!iaca_module_htab)
+    iaca_module_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  if (!iaca_dataspace_htab)
+    iaca_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
   while (!feof (fil))
     {
       ssize_t linlen = getline (&line, &siz, fil);
