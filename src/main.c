@@ -65,15 +65,138 @@ iaca_node_makevarf (IacaValue *conn, ...)
 }
 
 
+static const struct iacaset_st iaca_empty_set = {
+  .v_kind = IACAV_SET,
+  .v_cardinal = 0,
+  .v_elements = {}
+};
+
+static int
+iaca_itemptr_compare (const void *p1, const void *p2)
+{
+  IacaItem *i1 = *(IacaItem **) p1;
+  IacaItem *i2 = *(IacaItem **) p2;
+  if (i1 == i2)
+    return 0;
+  if (i1->v_ident < i2->v_ident)
+    return -1;
+  else
+    return 1;
+}
+
 IacaSet *
-iaca_set_make (IacaValue *parentset, IacaValue *elemtab[], unsigned card)
+iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
 {
   IacaSet *newset = 0;
-  unsigned newcard = 0;
-  if (parentset && parentset->v_kind != IACAV_SET)
+  IacaSet *parentset = 0;
+  unsigned newsiz = 0;
+  IacaItem **newitems = 0;
+  unsigned nbelems = 0;
+  unsigned parix = 0, parsiz = 0, newix = 0, cnt = 0;
+#define IACA_QUICK_MAX_CARDINAL 8
+  IacaItem *quitems[IACA_QUICK_MAX_CARDINAL] = { 0 };
+  if (!parent || parent->v_kind != IACAV_SET)
     parentset = NULL;
-#warning iaca_set_make incomplete
-  iaca_error ("iaca_set_make unimplemented");
+  else
+    parentset = (IacaSet *) parent;
+  /* fill newitems with a sequence of item elements, using quitems if
+     few enought to avoid memory allocation */
+  if (card < IACA_QUICK_MAX_CARDINAL)
+    newitems = quitems;
+  else
+    newitems = iaca_alloc_data (sizeof (IacaItem *) * card);
+  for (unsigned i = 0; i < card; i++)
+    {
+      IacaValue *curelem = elemtab[i];
+      if (curelem && curelem->v_kind == IACAV_ITEM)
+	newitems[nbelems++] = (IacaItem *) curelem;
+    };
+  if (nbelems == 0)
+    {
+      if (parentset)
+	return parentset;
+      return (IacaSet *) &iaca_empty_set;
+    }
+  else if (nbelems == 1)
+    {
+    }
+  else if (nbelems == 2)
+    {
+      if (newitems[0] == newitems[1])
+	nbelems = 1;
+      else if (newitems[0]->v_ident > newitems[1]->v_ident)
+	{
+	  IacaItem *it0 = newitems[0];
+	  IacaItem *it1 = newitems[1];
+	  newitems[0] = it1;
+	  newitems[1] = it0;
+	}
+    }
+  else
+    /* sort the newitems */
+    qsort (newitems, nbelems, sizeof (IacaItem *), iaca_itemptr_compare);
+  parsiz = parentset ? parentset->v_cardinal : 0;
+  newsiz = nbelems + parsiz;
+  newset = iaca_alloc_data (sizeof (IacaSet) + newsiz * sizeof (IacaItem *));
+  /* now, merge the newitems with the existing ones in parentset */
+  parix = 0;
+  newix = 0;
+  cnt = 0;
+  for (;;)
+    {
+      IacaItem *parelem = (parix < parsiz) ? parentset->v_elements[parix] : 0;
+      IacaItem *newelem = (newix < nbelems) ? newitems[newix] : 0;
+      IacaItem *prevelem = (cnt > 0) ? newset->v_elements[cnt - 1] : 0;
+      if (!parelem && !newelem)
+	break;
+      if (!parelem)
+	{
+	  if (prevelem != newelem)
+	    newset->v_elements[cnt++] = newelem;
+	  newix++;
+	  continue;
+	}
+      if (!newelem)
+	{
+	  if (prevelem != parelem)
+	    newset->v_elements[cnt++] = parelem;
+	  parix++;
+	  continue;
+	}
+      if (parelem == newelem)
+	{
+	  if (prevelem != parelem)
+	    newset->v_elements[cnt++] = parelem;
+	  newix++;
+	  parix++;
+	  continue;
+	}
+      if (parelem->v_ident < newelem->v_ident)
+	{
+	  if (prevelem != parelem)
+	    newset->v_elements[cnt++] = parelem;
+	  parix++;
+	  continue;
+	}
+      else
+	{
+	  if (prevelem != newelem)
+	    newset->v_elements[cnt++] = newelem;
+	  newix++;
+	  continue;
+	}
+    }
+  if (cnt + 1 < 7 * newsiz / 8)
+    {				/* newset allocated too big! */
+      IacaSet *bigset = newset;
+      newset = iaca_alloc_data (sizeof (IacaSet) + cnt * sizeof (IacaItem *));
+      for (unsigned ix = 0; ix < cnt; ix++)
+	newset->v_elements[ix] = bigset->v_elements[ix];
+      GC_FREE (bigset);
+    };
+  newset->v_kind = IACAV_SET;
+  newset->v_cardinal = cnt;
+  return newset;
 }
 
 IacaItem *
