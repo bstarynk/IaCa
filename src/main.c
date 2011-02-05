@@ -65,11 +65,17 @@ iaca_node_makevarf (IacaValue *conn, ...)
 }
 
 
-static const struct iacaset_st iaca_empty_set = {
+static const struct iacaset_st iaca_empty_setdata = {
   .v_kind = IACAV_SET,
   .v_cardinal = 0,
   .v_elements = {}
 };
+
+IacaSet *
+iaca_the_empty_set (void)
+{
+  return (IacaSet *) &iaca_empty_setdata;
+}
 
 static int
 iaca_itemptr_compare (const void *p1, const void *p2)
@@ -87,16 +93,138 @@ iaca_itemptr_compare (const void *p1, const void *p2)
 /* we allocate on stack intermediate space for small sets, otherwise in heap */
 #define IACA_QUICK_MAX_CARDINAL 8
 
+/* internal function to make a set by merging two ordered array of items */
+static IacaSet *
+iaca_unsafe_set_make_merge (IacaItem *tab1[], unsigned cnt1,
+			    IacaItem *tab2[], unsigned cnt2)
+{
+  unsigned ix1 = 0, ix2 = 0, cnt = 0;
+  unsigned newsiz = cnt1 + cnt2;
+  IacaSet *newset =
+    iaca_alloc_data (sizeof (IacaSet) + newsiz * sizeof (IacaItem *));
+  for (;;)
+    {
+      IacaItem *it1 = (ix1 < cnt1) ? tab1[ix1] : 0;
+      IacaItem *it2 = (ix1 < cnt2) ? tab2[ix2] : 0;
+      IacaItem *prevelem = (cnt > 0) ? newset->v_elements[cnt - 1] : 0;
+      if (!it1 && !it2)
+	break;
+      if (!it1)
+	{
+	  if (prevelem != it2)
+	    newset->v_elements[cnt++] = it2;
+	  ix2++;
+	  continue;
+	}
+      if (!it2)
+	{
+	  if (prevelem != it1)
+	    newset->v_elements[cnt++] = it1;
+	  ix1++;
+	  continue;
+	}
+      if (it1 == it2)
+	{
+	  if (prevelem != it1)
+	    newset->v_elements[cnt++] = it1;
+	  ix1++;
+	  ix2++;
+	  continue;
+	}
+      if (it1->v_ident < it2->v_ident)
+	{
+	  if (prevelem != it1)
+	    newset->v_elements[cnt++] = it1;
+	  ix1++;
+	  continue;
+	}
+      else
+	{
+	  if (prevelem != it2)
+	    newset->v_elements[cnt++] = it2;
+	  ix2++;
+	  continue;
+	}
+    }
+  if (cnt + 1 < 7 * newsiz / 8)
+    {				/* newset allocated too big! */
+      IacaSet *bigset = newset;
+      newset = iaca_alloc_data (sizeof (IacaSet) + cnt * sizeof (IacaItem *));
+      for (unsigned ix = 0; ix < cnt; ix++)
+	newset->v_elements[ix] = bigset->v_elements[ix];
+      GC_FREE (bigset);
+    };
+  newset->v_kind = IACAV_SET;
+  newset->v_cardinal = cnt;
+  return newset;
+}
+
+
+IacaSet *
+iaca_set_singleton (IacaValue *v1)
+{
+  IacaSet *set = 0;
+  IacaItem *it1 = (v1 && v1->v_kind == IACAV_ITEM) ? ((IacaItem *) v1) : 0;
+  if (it1)
+    {
+      set = iaca_alloc_data (sizeof (IacaSet) + sizeof (IacaItem *));
+      set->v_kind = IACAV_SET;
+      set->v_cardinal = 1;
+      set->v_elements[0] = it1;
+      return set;
+    }
+  else
+    return (IacaSet *) &iaca_empty_setdata;
+}
+
+IacaSet *
+iaca_set_pair (IacaValue *v1, IacaValue *v2)
+{
+  IacaSet *set = 0;
+  IacaItem *it1 = (v1 && v1->v_kind == IACAV_ITEM) ? ((IacaItem *) v1) : 0;
+  IacaItem *it2 = (v2 && v2->v_kind == IACAV_ITEM) ? ((IacaItem *) v2) : 0;
+  if (!it1 && !it2)
+    return (IacaSet *) &iaca_empty_setdata;
+  if (!it2 || it1 == it2)
+    {
+      set = iaca_alloc_data (sizeof (IacaSet) + sizeof (IacaItem *));
+      set->v_elements[0] = it1;
+      set->v_kind = IACAV_SET;
+      set->v_cardinal = 1;
+      return set;
+    }
+  else if (!it1)
+    {
+      set = iaca_alloc_data (sizeof (IacaSet) + sizeof (IacaItem *));
+      set->v_elements[0] = it2;
+      set->v_kind = IACAV_SET;
+      set->v_cardinal = 1;
+      return set;
+    }
+  set = iaca_alloc_data (sizeof (IacaSet) + 2 * sizeof (IacaItem *));
+  if (it1->v_ident < it2->v_ident)
+    {
+      set->v_elements[0] = it1;
+      set->v_elements[1] = it2;
+    }
+  else
+    {
+      set->v_elements[0] = it2;
+      set->v_elements[1] = it1;
+    }
+  set->v_kind = IACAV_SET;
+  set->v_cardinal = 2;
+  return set;
+}
+
 
 IacaSet *
 iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
 {
   IacaSet *newset = 0;
   IacaSet *parentset = 0;
-  unsigned newsiz = 0;
   IacaItem **newitems = 0;
   unsigned nbelems = 0;
-  unsigned parix = 0, parsiz = 0, newix = 0, cnt = 0;
   IacaItem *quitems[IACA_QUICK_MAX_CARDINAL] = { 0 };
   if (!parent || parent->v_kind != IACAV_SET)
     parentset = NULL;
@@ -118,7 +246,7 @@ iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
     {
       if (parentset)
 	return parentset;
-      return (IacaSet *) &iaca_empty_set;
+      return (IacaSet *) &iaca_empty_setdata;
     }
   else if (nbelems == 1)
     {
@@ -138,69 +266,12 @@ iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
   else
     /* sort the newitems */
     qsort (newitems, nbelems, sizeof (IacaItem *), iaca_itemptr_compare);
-  parsiz = parentset ? parentset->v_cardinal : 0;
-  newsiz = nbelems + parsiz;
-  newset = iaca_alloc_data (sizeof (IacaSet) + newsiz * sizeof (IacaItem *));
-  /* now, merge the newitems with the existing ones in parentset */
-  parix = 0;
-  newix = 0;
-  cnt = 0;
-  for (;;)
-    {
-      IacaItem *parelem = (parix < parsiz) ? parentset->v_elements[parix] : 0;
-      IacaItem *newelem = (newix < nbelems) ? newitems[newix] : 0;
-      IacaItem *prevelem = (cnt > 0) ? newset->v_elements[cnt - 1] : 0;
-      if (!parelem && !newelem)
-	break;
-      if (!parelem)
-	{
-	  if (prevelem != newelem)
-	    newset->v_elements[cnt++] = newelem;
-	  newix++;
-	  continue;
-	}
-      if (!newelem)
-	{
-	  if (prevelem != parelem)
-	    newset->v_elements[cnt++] = parelem;
-	  parix++;
-	  continue;
-	}
-      if (parelem == newelem)
-	{
-	  if (prevelem != parelem)
-	    newset->v_elements[cnt++] = parelem;
-	  newix++;
-	  parix++;
-	  continue;
-	}
-      if (parelem->v_ident < newelem->v_ident)
-	{
-	  if (prevelem != parelem)
-	    newset->v_elements[cnt++] = parelem;
-	  parix++;
-	  continue;
-	}
-      else
-	{
-	  if (prevelem != newelem)
-	    newset->v_elements[cnt++] = newelem;
-	  newix++;
-	  continue;
-	}
-    }
-  if (cnt + 1 < 7 * newsiz / 8)
-    {				/* newset allocated too big! */
-      IacaSet *bigset = newset;
-      newset = iaca_alloc_data (sizeof (IacaSet) + cnt * sizeof (IacaItem *));
-      for (unsigned ix = 0; ix < cnt; ix++)
-	newset->v_elements[ix] = bigset->v_elements[ix];
-      GC_FREE (bigset);
-    };
-  newset->v_kind = IACAV_SET;
-  newset->v_cardinal = cnt;
+  newset = iaca_unsafe_set_make_merge (parentset->v_elements,
+				       parentset->v_cardinal,
+				       newitems, nbelems);
   return newset;
 }
+
 
 IacaSet *
 iaca_set_makevarf (IacaValue *parent, ...)
@@ -241,6 +312,191 @@ iaca_set_makevarf (IacaValue *parent, ...)
 }
 
 
+IacaSet *
+iaca_set_union (IacaValue *v1, IacaValue *v2)
+{
+  IacaSet *set1 = (v1 && v1->v_kind == IACAV_SET) ? ((IacaSet *) v1) : 0;
+  IacaSet *set2 = (v2 && v2->v_kind == IACAV_SET) ? ((IacaSet *) v2) : 0;
+  if (!set1 && !set2)
+    return (IacaSet *) &iaca_empty_setdata;
+  if (!set1 || set1->v_cardinal == 0)
+    return set2;
+  if (!set2 || set2->v_cardinal == 0)
+    return set1;
+  if (set1->v_cardinal == 1
+      && iaca_set_contains ((IacaValue *) set2,
+			    (IacaValue *) (set1->v_elements[0])))
+    return set2;
+  if (set2->v_cardinal == 1
+      && iaca_set_contains ((IacaValue *) set1,
+			    (IacaValue *) (set2->v_elements[0])))
+    return set1;
+  return
+    iaca_unsafe_set_make_merge (set1->v_elements, set1->v_cardinal,
+				set2->v_elements, set2->v_cardinal);
+}
+
+
+IacaSet *
+iaca_set_intersection (IacaValue *v1, IacaValue *v2)
+{
+  IacaSet *set1 = (v1 && v1->v_kind == IACAV_SET) ? ((IacaSet *) v1) : 0;
+  IacaSet *set2 = (v2 && v2->v_kind == IACAV_SET) ? ((IacaSet *) v2) : 0;
+  IacaSet *newset = 0;
+  IacaItem **bigtab = 0;
+  unsigned card1 = 0, card2 = 0;
+  unsigned newcard = 0;
+  unsigned ix1 = 0, ix2 = 0;
+  if (!set1 || !set2
+      || (card1 = set1->v_cardinal) == 0 || (card2 = set2->v_cardinal) == 0)
+    return (IacaSet *) &iaca_empty_setdata;
+  if (card1 > card2)
+    {
+      IacaSet *setmp = set1;
+      unsigned cardtmp = card1;
+      set1 = set2;
+      set2 = setmp;
+      card1 = card2;
+      card2 = cardtmp;
+    };
+  newset = iaca_alloc_data (sizeof (IacaSet) + card1 * sizeof (IacaItem *));
+  bigtab = newset->v_elements;
+  while (ix1 < card1 && ix2 < card2)
+    {
+      IacaItem *it1 = set1->v_elements[ix1];
+      IacaItem *it2 = set2->v_elements[ix2];
+      if (it1 == it2)
+	{
+	  bigtab[newcard++] = it1;
+	  ix1++;
+	  ix2++;
+	  continue;
+	}
+      else if (it1->v_ident < it2->v_ident)
+	ix1++;
+      else
+	ix2++;
+    }
+  if (newcard + 1 < 7 * card1 / 8)
+    {
+      IacaSet *bigset = newset;
+      newset =
+	iaca_alloc_data (sizeof (IacaSet) + newcard * sizeof (IacaItem *));
+      for (unsigned ix = 0; ix < newcard; ix++)
+	newset->v_elements[ix] = bigset->v_elements[ix];
+      GC_FREE (bigset);
+    };
+  newset->v_cardinal = newcard;
+  newset->v_kind = IACAV_SET;
+  return newset;
+}
+
+
+IacaSet *
+iaca_set_difference (IacaValue *v1, IacaValue *v2)
+{
+  unsigned ix1 = 0, ix2 = 0, card1 = 0, card2 = 0;
+  unsigned newcard = 0;
+  IacaSet *newset = 0;
+  IacaSet *set1 = (v1 && v1->v_kind == IACAV_SET) ? ((IacaSet *) v1) : 0;
+  IacaSet *set2 = (v2 && v2->v_kind == IACAV_SET) ? ((IacaSet *) v2) : 0;
+  if (!set1 || (card1 = set1->v_cardinal) == 0)
+    return (IacaSet *) &iaca_empty_setdata;
+  if (!set2 || (card2 = set2->v_cardinal) == 0)
+    return set1;
+  if (card2 == 1 && !iaca_set_contains ((IacaValue *) set1,
+					(IacaValue *) (set2->v_elements[0])))
+    return set1;
+  newset = iaca_alloc_data (sizeof (IacaSet) + card1 * sizeof (IacaItem *));
+  while (ix1 < card1 && ix2 < card2)
+    {
+      IacaItem *it1 = set1->v_elements[ix1];
+      IacaItem *it2 = set2->v_elements[ix2];
+      if (it1 == it2)
+	{
+	  ix1++;
+	  ix2++;
+	  continue;
+	}
+      if (it1->v_ident < it2->v_ident)
+	{
+	  newset->v_elements[newcard++] = it1;
+	  ix1++;
+	}
+      else
+	ix2++;
+    }
+  if (newcard + 1 < 7 * card1 / 8)
+    {
+      IacaSet *bigset = newset;
+      newset =
+	iaca_alloc_data (sizeof (IacaSet) + newcard * sizeof (IacaItem *));
+      for (unsigned ix = 0; ix < newcard; ix++)
+	newset->v_elements[ix] = bigset->v_elements[ix];
+      GC_FREE (bigset);
+    };
+  newset->v_cardinal = newcard;
+  newset->v_kind = IACAV_SET;
+  return newset;
+}
+
+
+IacaSet *
+iaca_set_symetric_difference (IacaValue *v1, IacaValue *v2)
+{
+  unsigned ix1 = 0, ix2 = 0, card1 = 0, card2 = 0;
+  unsigned newcard = 0, newsiz = 0;
+  IacaSet *newset = 0;
+  IacaSet *set1 = (v1 && v1->v_kind == IACAV_SET) ? ((IacaSet *) v1) : 0;
+  IacaSet *set2 = (v2 && v2->v_kind == IACAV_SET) ? ((IacaSet *) v2) : 0;
+  if (!set1 || (card1 = set1->v_cardinal) == 0)
+    return set2;
+  if (!set2 || (card2 = set2->v_cardinal) == 0)
+    return set1;
+  if (card2 == 1 && !iaca_set_contains ((IacaValue *) set1,
+					(IacaValue *) (set2->v_elements[0])))
+    return set1;
+  if (card1 == 1 && !iaca_set_contains ((IacaValue *) set2,
+					(IacaValue *) (set1->v_elements[0])))
+    return set2;
+  newsiz = card1 + card2;
+  newset = iaca_alloc_data (sizeof (IacaSet) + newsiz * sizeof (IacaItem *));
+  while (ix1 < card1 && ix2 < card2)
+    {
+      IacaItem *it1 = set1->v_elements[ix1];
+      IacaItem *it2 = set2->v_elements[ix2];
+      if (it1 == it2)
+	{
+	  ix1++;
+	  ix2++;
+	  continue;
+	}
+      if (it1->v_ident < it2->v_ident)
+	{
+	  newset->v_elements[newcard++] = it1;
+	  ix1++;
+	}
+      else if (it1->v_ident > it2->v_ident)
+	{
+	  newset->v_elements[newcard++] = it2;
+	  ix2++;
+	}
+    }
+  if (newcard + 1 < 7 * newsiz / 8)
+    {
+      IacaSet *bigset = newset;
+      newset =
+	iaca_alloc_data (sizeof (IacaSet) + newcard * sizeof (IacaItem *));
+      for (unsigned ix = 0; ix < newcard; ix++)
+	newset->v_elements[ix] = bigset->v_elements[ix];
+      GC_FREE (bigset);
+    };
+  newset->v_cardinal = newcard;
+  newset->v_kind = IACAV_SET;
+  return newset;
+}
+
+////////////////////////////////////////////////////////////////
 IacaItem *
 iaca_item_make (void)
 {

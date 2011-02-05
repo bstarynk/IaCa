@@ -249,6 +249,9 @@ struct iacaset_st
 // allocator of a set with a parent set and an  array of item elements.
 extern IacaSet *iaca_set_make (IacaValue *parentset, IacaValue *elemtab[],
 			       unsigned card);
+#define iacav_set_make(Par,Elem,Card) \
+  ((IacaValue*)iaca_set_make((Par),(Elem),(Card)))
+
 // variadic allocator of a set with its parent and elements, null terminated
 extern IacaSet *iaca_set_makevarf (IacaValue *parentset, ...)
   __attribute__ ((sentinel));
@@ -256,6 +259,38 @@ extern IacaSet *iaca_set_makevarf (IacaValue *parentset, ...)
   iaca_set_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)
 #define iaca_set_makenewvar(...) \
   iaca_set_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
+
+/* return the canonical empty set*/
+extern IacaSet *iaca_the_empty_set (void);
+
+/* return a singleton, or the empty set is v1 not an item */
+extern IacaSet *iaca_set_singleton (IacaValue *v1);
+/* return a pair, or a singleton, or an empty set ... */
+extern IacaSet *iaca_set_pair (IacaValue *v1, IacaValue *v2);
+
+/* in set operation, non-set or null values are "idempotent" */
+
+/* union of V1 & V2 contains all elements of v1 and all of v2 */
+extern IacaSet *iaca_set_union (IacaValue *v1, IacaValue *v2);
+#define iacav_set_union(V1,V2) \
+  ((IacaValue*)iaca_set_union((V1),(V2)))
+
+/* intersection of V1 & V2 contains all elements both in v1 and v2 */
+extern IacaSet *iaca_set_intersection (IacaValue *v1, IacaValue *v2);
+#define iacav_set_intersection(V1,V2) \
+  ((IacaValue*)iaca_set_intersection((V1),(V2)))
+
+/* difference of V1 & V2 contains all elements in v1 which are not in v2 */
+extern IacaSet *iaca_set_difference (IacaValue *v1, IacaValue *v2);
+#define iacav_set_difference(V1,V2) \
+  ((IacaValue*)iaca_set_difference((V1),(V2)))
+
+/* symetric difference of V1 & V2 contains all elements which are
+   either in v1 or in v2 but not in both */
+extern IacaSet *iaca_set_symetric_difference (IacaValue *v1, IacaValue *v2);
+#define iacav_set_symetric_difference(V1,V2) \
+  ((IacaValue*)iaca_set_symetric_difference((V1),(V2)))
+
 
 static inline int iaca_set_cardinal_def (IacaValue *v, int def);
 
