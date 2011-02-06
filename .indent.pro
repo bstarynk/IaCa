@@ -7,3 +7,4 @@
 -T IacaItem
 -T gchar
 -T GtkWidget
+-T json_t

@@ -316,9 +316,13 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 
   Item contents are serialized like
   { "item" : <id-number> ,
-    "attr" : [ <item-attribute...> ] ,
-    "payload" : <item-payload> 
+    "itemattrs" : [ <item-attribute...> ] ,
+    "itempayload" : <item-payload> 
   }
+
+  Each <item-attribute> is a JSON object like  
+  { "atid" : <attribute-id-number> ,
+    "val" : <value> }
   
   
 
@@ -420,10 +424,16 @@ static inline IacaValue *iaca_item_next_attribute (IacaValue *vitem,
 
 /* iterate inside an item attribute; Item and Attr should be local
    variables; Item should not be modified inside the for body. */
-#define IACA_FOREACH_ITEM_ATTRIBUTE(Item,Attr)		\
-  for(Attr=iaca_item_first_attribute ((Item));		\
-      (Attr) != NULL;					\
-      Attr = iaca_item_next_attribute((Item),(Attr)))
+#define IACA_FOREACH_ITEM_ATTRIBUTE(Vitem,Vattr)		\
+  for(Vattr=iaca_item_first_attribute ((Vitem));		\
+      (Vattr) != NULL;						\
+      Vattr = iaca_item_next_attribute((Vitem),(Vattr)))
+
+#define IACA_FOREACH_ITEM_ATTRIBUTE_LOCAL(Vitem,Vattr)		\
+  for (IacaValue* Vattr=iaca_item_first_attribute ((Vitem));	\
+       (Vattr) != NULL;						\
+       Vattr = iaca_item_next_attribute((Vitem),		\
+                                       (Vattr)))
 
 static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
 
@@ -690,6 +700,7 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
 	continue;
       return (IacaValue *) curit;
     }
+  return NULL;
 }
 
 

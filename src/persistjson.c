@@ -126,7 +126,7 @@ iaca_json_error_printf_at (int lin, struct iacaloader_st *ld, const char *fmt,
 
 
 IacaValue *
-iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
+iaca_json_to_value (struct iacaloader_st *ld, const json_t *js)
 {
   IacaValue *res = 0;
   int ty = 0;
@@ -234,11 +234,50 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 }
 
 static void
-iaca_load_item_content (struct iacaloader_st *ld, json_t * js)
+iaca_load_item_content (struct iacaloader_st *ld, json_t *js)
 {
+  long long id = 0;
+  IacaItem *itm = 0;
+  json_t *jsattrs = 0;
+  int nbattrs = 0;
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
-  iaca_error ("iaca_load_item_content unimplemented");
-#warning iaca_load_item_content not implemented
+  if (!json_is_object (js))
+    iaca_json_error_printf (ld, "exepecting an object for item content");
+  id = json_integer_value (json_object_get (js, "item"));
+  if (id <= 0)
+    iaca_json_error_printf (ld, "invalid id %lld for loaded item content",
+			    id);
+  itm = iaca_retrieve_loaded_item (ld, id);
+  if (itm->v_dataspace)
+    iaca_json_error_printf
+      (ld, "loaded item #%lld has dataspace %s",
+       id,
+       iaca_string_val_def ((IacaValue *) itm->v_dataspace->dsp_name, "??"));
+  itm->v_dataspace = ld->ld_dataspace;
+  jsattrs = json_object_get (js, "itemattrs");
+  if (!json_is_array (jsattrs))
+    iaca_json_error_printf (ld, "loaded item #%lld without itemattrs", id);
+  nbattrs = json_array_size (jsattrs);
+  for (int ix = 0; ix < nbattrs; ix++)
+    {
+      json_t *jscurat = json_array_get (jsattrs, ix);
+      long long atid = 0;
+      IacaValue *val = 0;
+      IacaItem *atitm = 0;
+      if (!json_is_object (jscurat))
+	iaca_json_error_printf (ld, "attribute entry is not a Json object");
+      atid = json_integer_value (json_object_get (jscurat, "atid"));
+      if (atid <= 0)
+	iaca_json_error_printf (ld,
+				"bad attribute id #%lld in item #%lld content",
+				atid, id);
+      val = iaca_json_to_value (ld, json_object_get (jscurat, "val"));
+      if (!val)
+	continue;
+      atitm = iaca_retrieve_loaded_item (ld, atid);
+      iaca_item_physical_put ((IacaValue *) itm, (IacaValue *) atitm, val);
+    }
+#warning iaca_load_item_content not completed for item payload
 }
 
 static void
@@ -593,5 +632,41 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
     default:
       iaca_error ("unexepcted value kind %d", (int) val->v_kind);
     }
+}
 
+json_t *
+iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
+{
+  json_t *js = 0;
+  json_t *jsattr = 0;
+  if (!du)
+    return NULL;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  if (iaca_dump_item_is_transient (du, itm))
+    return json_null ();
+  js = json_object ();
+  json_object_set (js, "item", json_integer (itm->v_ident));
+  jsattr = json_array ();
+  IACA_FOREACH_ITEM_ATTRIBUTE_LOCAL ((IacaValue *) itm, vitat)
+  {
+    IacaValue *atval = NULL;
+    json_t *jsentry = NULL;
+    if (iaca_dump_item_is_transient (du, (IacaItem *) vitat))
+      continue;
+    atval = iaca_item_attribute_physical_get ((IacaValue *) itm, vitat);
+    if (!atval)
+      continue;
+    if (atval->v_kind == IACAV_ITEM
+	&& iaca_dump_item_is_transient (du, (IacaItem *) atval))
+      continue;
+    jsentry = json_object ();
+    json_object_set (jsentry, "atid",
+		     json_integer (((IacaItem *) vitat)->v_ident));
+    json_object_set (jsentry, "val", iaca_dump_value_json (du, atval));
+    json_array_append_new (jsattr, jsentry);
+    jsentry = NULL;
+  }
+  json_object_set (js, "itemattrs", jsattr);
+#warning should dump the payload
+  return js;
 }
