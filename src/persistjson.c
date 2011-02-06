@@ -22,8 +22,10 @@
 
 #define IACA_JSON_VERSION "2011A"
 
+#define IACA_LOADER_MAGIC 0x347b938b	/*880513931 */
 struct iacaloader_st
 {
+  unsigned ld_magic;		/* always IACA_LOADER_MAGIC */
   /* Glib hash table asociating item identifiers to loaded item, actually
      the key is a IacaItem structure ... */
   GHashTable *ld_itemhtab;
@@ -33,12 +35,23 @@ struct iacaloader_st
   jmp_buf ld_errjmp;
   /* the associated error message GC_strdup-ed */
   const char *ld_errstr;
-  /* the originating error line */
+  /* the originating error line as given by __LINE__ here */
   int ld_errline;
   /* current dataspace */
   struct iacadataspace_st *ld_dataspace;
 };
 
+
+
+#define IACA_DUMPER_MAGIC 0x3e4fde5d	/*1045421661 */
+struct iacadumper_st
+{
+  unsigned du_magic;		/* always IACA_DUMPER_MAGIC */
+  /* the queue of items to be scanned */
+  GQueue *du_scanqueue;
+  /* the hash table of already scanned items */
+  GHashTable *du_itemhtab;
+};
 
 
 /* a Glib GHashTable compatible hash function on items */
@@ -100,6 +113,7 @@ iaca_json_error_printf_at (int lin, struct iacaloader_st *ld, const char *fmt,
 {
   const char *msg = 0;
   va_list args;
+  g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   va_start (args, fmt);
   msg = g_strdup_vprintf (fmt, args);
   va_end (args);
@@ -118,6 +132,7 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
   int ty = 0;
   if (!ld)
     iaca_error ("null ld");
+  g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   if (!js)
     iaca_json_error_printf (ld, "null json pointer");
   ty = json_typeof (js);
@@ -221,6 +236,7 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 static void
 iaca_load_item_content (struct iacaloader_st *ld, json_t * js)
 {
+  g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   iaca_error ("iaca_load_item_content unimplemented");
 #warning iaca_load_item_content not implemented
 }
@@ -234,6 +250,7 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath,
   json_t *jsitarr = 0;
   size_t nbit = 0;
   memset (&jerr, 0, sizeof (jerr));
+  g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   ld->ld_dataspace = iaca_dataspace (spacename);
   ld->ld_root = json_load_file (datapath, 0, &jerr);
   if (!ld->ld_root)
@@ -367,6 +384,7 @@ iaca_load (const char *dirpath)
     dirpath = ".";
   manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
   memset (&ld, 0, sizeof (ld));
+  ld.ld_magic = IACA_LOADER_MAGIC;
   ld.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
   fil = fopen (manipath, "r");
   if (!fil)
@@ -405,4 +423,175 @@ iaca_load (const char *dirpath)
 	  iaca_load_data (&ld, datapath, name);
 	}
     }
+}
+
+
+
+
+
+/*****************************************************************/
+
+// routine to queue an item to be scanned for dumping; return true if
+// the item is transient and should be ignored
+bool
+iaca_dump_queue_item (struct iacadumper_st *du, IacaItem *itm)
+{
+  IacaItem *fnditm = 0;
+  if (!du || !itm || itm->v_kind != IACAV_ITEM)
+    return true;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (du->du_scanqueue);
+  g_assert (du->du_itemhtab);
+  fnditm = g_hash_table_lookup (du->du_itemhtab, itm);
+  if (fnditm)
+    {				/* item already scanned */
+      g_assert (fnditm == itm);
+      return false;
+    }
+  /** we probably should add a hook to add a dataspace if none */
+  /* ignore item without dataspace */
+  if (!itm->v_dataspace)
+    return true;
+  g_queue_push_tail (du->du_scanqueue, (gpointer) itm);
+  return false;
+}
+
+
+// test if an item is transient, that is should not be dumped!
+static inline bool
+iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem *itm)
+{
+  if (!du || !itm)
+    return true;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (itm->v_kind == IACAV_ITEM);
+  g_assert (du->du_itemhtab);
+  if (g_hash_table_lookup (du->du_itemhtab, itm))
+    return false;
+  return true;
+}
+
+// recursive routine to scan a data for dumping
+void
+iaca_dump_scan_value (struct iacadumper_st *du, IacaValue *val)
+{
+  if (!du)
+    return;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+scanagain:
+  if (!val)
+    return;
+  switch (val->v_kind)
+    {
+    case IACAV_INTEGER:
+      return;
+    case IACAV_STRING:
+      return;
+    case IACAV_NODE:
+      {
+	IacaNode *nod = (IacaNode *) val;
+	if (iaca_dump_queue_item (du, nod->v_conn))
+	  return;
+	for (int i = (int)(nod->v_arity) - 1; i > 0; i--)
+	  iaca_dump_scan_value (du, nod->v_sons[i]);
+	if (nod->v_arity > 0)
+	  {
+	    val = nod->v_sons[0];
+	    goto scanagain;
+	  }
+	return;
+      }
+    case IACAV_SET:
+      {
+	IacaSet *set = (IacaSet *) val;
+	for (int i = 0; i < (int) (set->v_cardinal); i++)
+	  (void) iaca_dump_queue_item (du, set->v_elements[i]);
+	return;
+      }
+    case IACAV_ITEM:
+      (void) iaca_dump_queue_item (du, (IacaItem *) val);
+      return;
+    default:
+      iaca_error ("unexepcted value kind %d", (int) val->v_kind);
+    }
+}
+
+// recursive routine to build a json value from a Iaca value while
+// dumping
+
+json_t *
+iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
+{
+  json_t *js = 0;
+  if (!du)
+    return NULL;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  if (!val)
+    return json_null ();
+  switch (val->v_kind)
+    {
+    case IACAV_INTEGER:
+      {
+	IacaInteger *iv = (IacaInteger *) val;
+	js = json_object ();
+	json_object_set (js, "kd", json_string ("intv"));
+	json_object_set (js, "int", json_integer (iv->v_num));
+	return js;
+      }
+    case IACAV_STRING:
+      {
+	IacaString *is = (IacaString *) val;
+	js = json_object ();
+	json_object_set (js, "kd", json_string ("strv"));
+	json_object_set (js, "str", json_string (is->v_str));
+	return js;
+      };
+    case IACAV_NODE:
+      {
+	IacaNode *nod = (IacaNode *) val;
+	json_t *jsarrson = NULL;
+	if (iaca_dump_item_is_transient (du, nod->v_conn))
+	  return json_null ();
+	js = json_object ();
+	json_object_set (js, "kd", json_string ("nodv"));
+	json_object_set (js, "conid", json_integer (nod->v_conn->v_ident));
+	jsarrson = json_array ();
+	for (int ix = 0; ix < nod->v_arity; ix++)
+	  json_array_append_new (jsarrson,
+				 iaca_dump_value_json (du, nod->v_sons[ix]));
+	json_object_set (js, "sons", jsarrson);
+	return js;
+      }
+    case IACAV_SET:
+      {
+	IacaSet *set = (IacaSet *) val;
+	json_t *jsarrelem = NULL;
+	js = json_object ();
+	json_object_set (js, "kd", json_string ("setv"));
+	jsarrelem = json_array ();
+	for (int ix = 0; ix < set->v_cardinal; ix++)
+	  {
+	    IacaItem *curitm = 0;
+	    curitm = set->v_elements[ix];
+	    if (iaca_dump_item_is_transient (du, curitm))
+	      continue;
+	    json_array_append_new (jsarrelem, json_integer (curitm->v_ident));
+	  };
+	json_object_set (js, "elemids", jsarrelem);
+	return js;
+      }
+    case IACAV_ITEM:
+      {
+	IacaItem *itm = (IacaItem *) val;
+	if (iaca_dump_item_is_transient (du, itm))
+	  return json_null ();
+	js = json_object ();
+	json_object_set (js, "kd", json_string ("itrv"));
+	json_object_set (js, "id", json_integer (itm->v_ident));
+	return js;
+      }
+    default:
+      iaca_error ("unexepcted value kind %d", (int) val->v_kind);
+    }
+
 }
