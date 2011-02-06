@@ -364,7 +364,6 @@ struct iacaitem_st
   };
 };
 
-int64_t iaca_item_last_ident;
 
 /* make an item */
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
@@ -442,7 +441,17 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 
 
 
-
+////////////////////////////////////////////////////////////////
+/* the structure describing the entire state of the IaCa system */
+extern struct iaca_st
+{
+  /* hashtable of modules */
+  GHashTable *ia_module_htab;
+  /* hashtable of data spaces */
+  GHashTable *ia_dataspace_htab;
+  /* last item identifier */
+  int64_t ia_item_last_ident;
+} iaca;
 /*****************************************************************************
  *****************************************************************************
  *****************************************************************************/
@@ -786,14 +795,10 @@ struct iacadataspace_st
   IacaString *dsp_name;
 };
 
-/* hashtable of modules */
-GHashTable *iaca_module_htab;
-/* hashtable of data spaces */
-GHashTable *iaca_dataspace_htab;
 
 struct iacadataspace_st *iaca_dataspace (const char *name);
 
-void iaca_load (const char *);
+void iaca_load (const char *dirpath);
 
 /* load a [binary] module of a given name which should contain only
    letters from A-Z a-z, digits 0-9 or underscore _. Returns NULL on

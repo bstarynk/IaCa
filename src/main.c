@@ -20,6 +20,8 @@
 #include "iaca.h"
 
 
+struct iaca_st iaca;
+
 IacaNode *
 iaca_node_make (IacaValue *conn, IacaValue *sontab[], unsigned arity)
 {
@@ -502,10 +504,10 @@ iaca_item_make (struct iacadataspace_st *sp)
 {
   IacaItem *itm = 0;
   g_assert (sp == NULL || sp->dsp_magic == IACA_SPACE_MAGIC);
-  iaca_item_last_ident++;
+  iaca.ia_item_last_ident++;
   itm = iaca_alloc_data (sizeof (IacaItem));
   itm->v_kind = IACAV_ITEM;
-  itm->v_ident = iaca_item_last_ident;
+  itm->v_ident = iaca.ia_item_last_ident;
   itm->v_attrtab = NULL;
   itm->v_payloadkind = IACAPAYLOAD__NONE;
   itm->v_payloadptr = NULL;
@@ -732,16 +734,16 @@ iaca_dataspace (const char *name)
   for (const char *pc = name; *pc; pc++)
     if (!g_ascii_isalnum (*pc) && *pc != '_')
       return NULL;
-  if (!iaca_dataspace_htab)
-    iaca_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
-  dsp = g_hash_table_lookup (iaca_dataspace_htab, name);
+  if (!iaca.ia_dataspace_htab)
+    iaca.ia_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  dsp = g_hash_table_lookup (iaca.ia_dataspace_htab, name);
   if (!dsp)
     {
       IacaString *strn = iaca_string_make (name);
       dsp = g_malloc0 (sizeof (*dsp));
       dsp->dsp_name = strn;
       dsp->dsp_magic = IACA_SPACE_MAGIC;
-      g_hash_table_insert (iaca_dataspace_htab,
+      g_hash_table_insert (iaca.ia_dataspace_htab,
 			   (gpointer) iaca_string_val ((IacaValue *) strn),
 			   dsp);
     }

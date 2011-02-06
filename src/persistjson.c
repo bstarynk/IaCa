@@ -92,8 +92,8 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   itm->v_kind = IACAV_ITEM;
   itm->v_ident = id;
   itm->v_dataspace = ld->ld_dataspace;
-  if (iaca_item_last_ident < id)
-    iaca_item_last_ident = id;
+  if (iaca.ia_item_last_ident < id)
+    iaca.ia_item_last_ident = id;
   itm->v_attrtab = NULL;
   itm->v_payloadkind = IACAPAYLOAD__NONE;
   itm->v_payloadptr = NULL;
@@ -321,7 +321,7 @@ iaca_load_module (const char *dirpath, const char *modname)
 	return err;
       };
   //
-  module = g_hash_table_lookup (iaca_module_htab, modname);
+  module = g_hash_table_lookup (iaca.ia_module_htab, modname);
   if (module)
     {
       char *msg = g_strdup_printf ("module %s already loaded as %s", modname,
@@ -359,7 +359,7 @@ iaca_load_module (const char *dirpath, const char *modname)
       char *msg
 	=
 	g_strdup_printf
-	("failed to load module %s in src/ or module/ of %s: %s",
+	("failed to load module %s in src/ or module/ of %s : %s",
 	 modname, dirpath, g_module_error ());
       const char *err = GC_STRDUP (msg);
       g_free (msg);
@@ -367,7 +367,7 @@ iaca_load_module (const char *dirpath, const char *modname)
     }
   // the module is resident, we never really g_module_close it!
   g_module_make_resident (module);
-  g_hash_table_insert (iaca_module_htab, (gpointer) modname,
+  g_hash_table_insert (iaca.ia_module_htab, (gpointer) modname,
 		       (gpointer) module);
   return NULL;
 }
@@ -391,10 +391,10 @@ iaca_load (const char *dirpath)
     iaca_error ("failed to open manifest file %s - %m", manipath);
   siz = 80;
   line = calloc (siz, 1);
-  if (!iaca_module_htab)
-    iaca_module_htab = g_hash_table_new (g_str_hash, g_str_equal);
-  if (!iaca_dataspace_htab)
-    iaca_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  if (!iaca.ia_module_htab)
+    iaca.ia_module_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  if (!iaca.ia_dataspace_htab)
+    iaca.ia_dataspace_htab = g_hash_table_new (g_str_hash, g_str_equal);
   while (!feof (fil))
     {
       ssize_t linlen = getline (&line, &siz, fil);
@@ -512,7 +512,7 @@ scanagain:
       (void) iaca_dump_queue_item (du, (IacaItem *) val);
       return;
     default:
-      iaca_error ("unexepcted value kind %d", (int) val->v_kind);
+      iaca_error ("unexpected value kind %d", (int) val->v_kind);
     }
 }
 
