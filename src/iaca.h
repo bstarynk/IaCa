@@ -260,6 +260,20 @@ extern IacaSet *iaca_set_makevarf (IacaValue *parentset, ...)
 #define iaca_set_makenewvar(...) \
   iaca_set_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
 
+static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
+
+static inline IacaValue *iaca_set_first_element (IacaValue *vset);
+
+static inline IacaValue *iaca_set_after_element (IacaValue *vset,
+						 IacaValue *velem);
+
+/* iterate inside a set; Set and Elem should be local variables. Set
+   should not be modified inside the for body. */
+#define IACA_FOREACH_SET_ELEMENT(Set,Elem)		\
+  for (Elem=iaca_set_first_element((Set));		\
+       (Elem) != NULL;					\
+       Elem = iaca_set_after_element((Set),(Elem)))
+
 /* return the canonical empty set*/
 extern IacaSet *iaca_the_empty_set (void);
 
@@ -268,7 +282,7 @@ extern IacaSet *iaca_set_singleton (IacaValue *v1);
 /* return a pair, or a singleton, or an empty set ... */
 extern IacaSet *iaca_set_pair (IacaValue *v1, IacaValue *v2);
 
-/* in set operation, non-set or null values are "idempotent" */
+/* in set operations, non-set or null values are "idempotent" */
 
 /* union of V1 & V2 contains all elements of v1 and all of v2 */
 extern IacaSet *iaca_set_union (IacaValue *v1, IacaValue *v2);
@@ -328,10 +342,6 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 
 ***/
 
-
-/* Sets are immutable, and have a dichotomical array of items, so
-
-****/
 /* item payload */
 enum iacapayloadkind_en
 {
@@ -358,13 +368,13 @@ struct iacaitem_st
   IacaValue *v_itemcontent;	/* the mutable item content */
   struct iacadataspace_st *v_dataspace;	/* the item data space defines where it is
 					   persisted */
-  /* anonymous union of pointers for payload. Change simultanously the
-     v_payloadkind. */
+  /* anonymous union of pointers for pay load. Change simultanously
+     the v_payloadkind. */
   union
   {
-    void *v_payloadptr;
-    struct iacapayloadvector_st *v_payloadvect;
-    struct iacapayloaddictionnary_st *v_payloaddict;
+    void *v_payloadptr;		/* null when IACAPAYLOAD__NONE */
+    struct iacapayloadvector_st *v_payloadvect;	/* when IACAPAYLOAD_VECTOR */
+    struct iacapayloaddictionnary_st *v_payloaddict;	/* when IACAPAYLOAD_DICTIONNARY */
   };
 };
 
@@ -422,6 +432,8 @@ static inline IacaValue *iaca_item_first_attribute (IacaValue *vitem);
 static inline IacaValue *iaca_item_next_attribute (IacaValue *vitem,
 						   IacaValue *vattr);
 
+static inline int iaca_item_number_attributes (IacaValue *vitem);
+
 /* iterate inside an item attribute; Item and Attr should be local
    variables; Item should not be modified inside the for body. */
 #define IACA_FOREACH_ITEM_ATTRIBUTE(Vitem,Vattr)           \
@@ -435,21 +447,9 @@ static inline IacaValue *iaca_item_next_attribute (IacaValue *vitem,
        Vattr = iaca_item_next_attribute((Vitem),                \
                                        (Vattr)))
 
-static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
+static inline enum iacapayloadkind_en iaca_item_pay_load_kind (IacaItem *itm);
 
-static inline IacaValue *iaca_set_first_element (IacaValue *vset);
-
-static inline IacaValue *iaca_set_after_element (IacaValue *vset,
-						 IacaValue *velem);
-
-/* iterate inside a set; Set and Elem should be local variables. Set
-   should not be modified inside the for body. */
-#define IACA_FOREACH_SET_ELEMENT(Set,Elem)		\
-  for (Elem=iaca_set_first_element((Set));		\
-       (Elem) != NULL;					\
-       Elem = iaca_set_after_element((Set),(Elem)))
-
-
+static inline void iaca_item_clear_pay_load (IacaItem *itm);
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
@@ -671,6 +671,23 @@ iaca_item_first_attribute (IacaValue *vitem)
   return NULL;
 }
 
+static inline enum iacapayloadkind_en
+iaca_item_pay_load_kind (IacaItem *itm)
+{
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return IACAPAYLOAD__NONE;
+  return itm->v_payloadkind;
+}
+
+static inline void
+iaca_item_clear_pay_load (IacaItem *itm)
+{
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  itm->v_payloadkind = IACAPAYLOAD__NONE;
+  itm->v_payloadptr = NULL;
+}
+
 
 /* in item vitem, get the attribute following a given attribute, or else null */
 static inline IacaValue *
@@ -703,6 +720,20 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
   return NULL;
 }
 
+
+static inline int
+iaca_item_number_attributes (IacaValue *vitem)
+{
+  IacaItem *item = 0;
+  struct iacatabattr_st *tbl = 0;
+  if (!vitem || vitem->v_kind != IACAV_ITEM)
+    return 0;
+  item = (IacaItem *) vitem;
+  tbl = item->v_attrtab;
+  if (!tbl)
+    return 0;
+  return tbl->at_count;
+}
 
 /* internal UNSAFE routine to get inside a set the index of an item,
    or -1 iff not found. Don't call it, unless you are sure that set is
