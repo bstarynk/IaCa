@@ -378,6 +378,13 @@ struct iacaitem_st
   };
 };
 
+struct iacapayloadvector_st
+{
+  unsigned vec_siz;		/* allocated size */
+  unsigned vec_len;		/* used length */
+  IacaValue *vec_tab[];		/* vec_siz pointers, only the first
+				   vec_len are used */
+};
 
 /* make an item */
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
@@ -450,6 +457,16 @@ static inline int iaca_item_number_attributes (IacaValue *vitem);
 static inline enum iacapayloadkind_en iaca_item_pay_load_kind (IacaItem *itm);
 
 static inline void iaca_item_clear_pay_load (IacaItem *itm);
+
+extern void iaca_item_pay_load_resize_vector (IacaItem *itm, unsigned sz);
+
+static inline unsigned iaca_item_pay_load_vector_length (IacaItem *itm);
+
+static inline IacaValue *iaca_item_pay_load_nth_vector (IacaItem *itm,
+							int rk);
+
+static inline void iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk,
+						      IacaValue *val);
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
@@ -688,6 +705,49 @@ iaca_item_clear_pay_load (IacaItem *itm)
   itm->v_payloadptr = NULL;
 }
 
+
+static inline unsigned
+iaca_item_pay_load_vector_length (IacaItem *itm)
+{
+  struct iacapayloadvector_st *pv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (pv = itm->v_payloadvect) == NULL)
+    return 0;
+  return pv->vec_len;
+}
+
+static inline IacaValue *
+iaca_item_pay_load_nth_vector (IacaItem *itm, int rk)
+{
+  struct iacapayloadvector_st *pv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (pv = itm->v_payloadvect) == NULL)
+    return NULL;
+  if (rk < 0)
+    rk += pv->vec_len;
+  if (rk >= 0 && rk < pv->vec_len)
+    return pv->vec_tab[rk];
+  return NULL;
+}
+
+static inline void
+iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk, IacaValue *val)
+{
+  struct iacapayloadvector_st *pv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (pv = itm->v_payloadvect) == NULL)
+    return;
+  if (rk < 0)
+    rk += pv->vec_len;
+  if (rk >= 0 && rk < pv->vec_len)
+    pv->vec_tab[rk] = val;
+}
+
+static inline void iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk,
+						      IacaValue *val);
 
 /* in item vitem, get the attribute following a given attribute, or else null */
 static inline IacaValue *

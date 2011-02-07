@@ -694,6 +694,80 @@ iaca_item_physical_put (IacaValue *vitem, IacaValue *vattr, IacaValue *val)
 
 
 
+void
+iaca_item_pay_load_resize_vector (IacaItem *itm, unsigned len)
+{
+  unsigned sz = 0;
+  struct iacapayloadvector_st *oldpv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  for (unsigned nsz = 8; nsz < UINT_MAX / 2; nsz = nsz * 2)
+    {
+      unsigned s = nsz - 2;
+      if (s >= len)
+	{
+	  sz = s;
+	  break;
+	};
+      s = 3 * nsz / 2 - 3;
+      if (s > len)
+	{
+	  sz = s;
+	  break;
+	}
+    }
+  if (sz == 0)
+    iaca_error ("too big vector length %u", len);
+  if (itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (oldpv = itm->v_payloadvect) == 0)
+    {
+      struct iacapayloadvector_st *pv = 0;
+      iaca_item_clear_pay_load (itm);
+      pv =
+	iaca_alloc_data (sizeof (struct iacapayloadvector_st) +
+			 sz * sizeof (IacaValue *));
+      pv->vec_siz = sz;
+      pv->vec_len = len;
+      itm->v_payloadkind = IACAPAYLOAD_VECTOR;
+      itm->v_payloadvect = pv;
+      return;
+    }
+  else if (oldpv->vec_siz < len)
+    {
+      struct iacapayloadvector_st *pv = 0;
+      pv =
+	iaca_alloc_data (sizeof (struct iacapayloadvector_st) +
+			 sz * sizeof (IacaValue *));
+      pv->vec_siz = sz;
+      pv->vec_len = len;
+      memcpy (pv->vec_tab, oldpv->vec_tab,
+	      sizeof (struct iacapayloadvector_st) +
+	      (oldpv->vec_len) * sizeof (IacaValue *));
+      itm->v_payloadvect = pv;
+      GC_FREE (oldpv);
+    }
+  else if (oldpv->vec_siz > sz)
+    {
+      struct iacapayloadvector_st *pv = 0;
+      pv =
+	iaca_alloc_data (sizeof (struct iacapayloadvector_st) +
+			 sz * sizeof (IacaValue *));
+      pv->vec_siz = sz;
+      pv->vec_len = len;
+      memcpy (pv->vec_tab, oldpv->vec_tab,
+	      sizeof (struct iacapayloadvector_st) +
+	      len * sizeof (IacaValue *));
+      itm->v_payloadvect = pv;
+      GC_FREE (oldpv);
+    }
+  else
+    {
+      memset (oldpv->vec_tab + len, 0,
+	      sizeof (void *) * (oldpv->vec_siz - len));
+      oldpv->vec_len = len;
+    }
+}
+
 IacaValue *
 iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 {

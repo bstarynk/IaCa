@@ -667,8 +667,19 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
     case IACAPAYLOAD__NONE:
       return json_null ();
     case IACAPAYLOAD_VECTOR:
+      {
+	json_t *js = 0;
+	json_t *jsarr = json_array ();
+	unsigned ln = iaca_item_pay_load_vector_length (itm);
+	for (unsigned ix = 0; ix < ln; ix++)
+	  json_array_append_new (jsarr,
+				 iaca_dump_value_json (du,
+						       iaca_item_pay_load_nth_vector
+						       (itm, ix)));
+	js = json_object ();
+      }
     case IACAPAYLOAD_DICTIONNARY:
-#warning iaca_dump_item_pay_load_json incomplete
+#warning iaca_dump_item_pay_load_json incomplete, maybe should get containing json as argument
       iaca_error ("unimplemented iaca_dump_item_payload_json");
     }
 }
