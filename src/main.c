@@ -985,6 +985,67 @@ iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
   buf->buf_len += pl;
 }
 
+
+void
+iaca_item_pay_load_reserve_dictionnary (IacaItem *itm, unsigned sz)
+{
+  struct iacapayloaddictionnary_st *olddic = 0;
+  unsigned nsz = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  for (unsigned z = 8; z > 0; z = 2 * z)
+    {
+      unsigned s = z - 2;
+      if (s > sz)
+	{
+	  nsz = s;
+	  break;
+	}
+      s = 3 * sz / 2 - 2;
+      if (s > sz)
+	{
+	  nsz = s;
+	  break;
+	};
+    }
+  if (nsz == 0)
+    iaca_error ("too big dictionnary size %u", sz);
+  if (itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY)
+    {
+      struct iacapayloaddictionnary_st *dic = 0;
+      iaca_item_pay_load_clear (itm);
+      dic =
+	iaca_alloc_data (sizeof (struct iacapayloaddictionnary_st) +
+			 nsz * sizeof (struct iacadictentry_st));
+      dic->dic_siz = nsz;
+      dic->dic_len = 0;
+      itm->v_payloadkind = IACAPAYLOAD_DICTIONNARY;
+      itm->v_payloaddict = dic;
+      return;
+    }
+  olddic = itm->v_payloaddict;
+  if (!olddic || olddic->dic_siz < nsz)
+    {
+      struct iacapayloaddictionnary_st *dic = 0;
+      dic =
+	iaca_alloc_data (sizeof (struct iacapayloaddictionnary_st) +
+			 nsz * sizeof (struct iacadictentry_st));
+      dic->dic_siz = nsz;
+      if (olddic)
+	{
+	  memcpy (dic->dic_tab, olddic->dic_tab,
+		  olddic->dic_len * sizeof (struct iacadictentry_st));
+	  dic->dic_len = olddic->dic_len;
+	}
+      itm->v_payloadkind = IACAPAYLOAD_DICTIONNARY;
+      itm->v_payloaddict = dic;
+      if (olddic)
+	GC_FREE (olddic);
+      return;
+    }
+}
+
+
 IacaValue *
 iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 {
@@ -1014,6 +1075,140 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
   return oldval;
 }
 
+void
+iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
+				    IacaValue *val)
+{
+  int lo = 0, hi = 0, md = 0;
+  struct iacapayloaddictionnary_st *dic = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || !strv || strv->v_kind != IACAV_STRING
+      || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY || !val)
+    return;
+  dic = itm->v_payloaddict;
+  if (!dic)
+    {
+      iaca_item_pay_load_reserve_dictionnary (itm, 5);
+      dic = itm->v_payloaddict;
+    }
+  else if (dic->dic_len + 2 >= dic->dic_siz)
+    {
+      iaca_item_pay_load_reserve_dictionnary (itm, 5 * dic->dic_len / 4 + 10);
+      dic = itm->v_payloaddict;
+    }
+  lo = 0;
+  hi = dic->dic_len - 1;
+  if (hi < 0)
+    {
+      dic->dic_tab[0].de_str = strv;
+      dic->dic_tab[0].de_val = val;
+      dic->dic_len = 1;
+      return;
+    }
+  while (lo + 1 < hi)
+    {
+      IacaString *curstr = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      curstr = dic->dic_tab[md].de_str;
+      g_assert (curstr != 0 && curstr->v_kind == IACAV_STRING);
+      cmp = strcmp (curstr->v_str, strv->v_str);
+      if (!cmp)
+	{
+	  dic->dic_tab[md].de_val = val;
+	  return;
+	}
+      if (cmp < 0)
+	hi = md;
+      else
+	lo = md;
+    }
+  for (md = lo; md <= hi; md++)
+    {
+      int cmp = 0;
+      IacaString *curstr = dic->dic_tab[md].de_str;
+      g_assert (curstr != 0 && curstr->v_kind == IACAV_STRING);
+      cmp = strcmp (curstr->v_str, strv->v_str);
+      if (!cmp)
+	{
+	  dic->dic_tab[md].de_val = val;
+	  return;
+	};
+      if (cmp > 0)
+	{
+	  /* insert strv before md */
+	  for (int j = dic->dic_len - 1; j >= md; j--)
+	    dic->dic_tab[j + 1] = dic->dic_tab[j];
+	  dic->dic_tab[md].de_str = strv;
+	  dic->dic_tab[md].de_val = val;
+	  dic->dic_len++;
+	  return;
+	}
+    }
+  if (strcmp (dic->dic_tab[dic->dic_len - 1].de_str->v_str, strv->v_str) < 0)
+    {
+      md = dic->dic_len;
+      dic->dic_tab[md].de_str = strv;
+      dic->dic_tab[md].de_val = val;
+      dic->dic_len++;
+      return;
+    }
+}
+
+void
+iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
+{
+  int lo = 0, hi = 0, md = 0;
+  int ix = -1;
+  struct iacapayloaddictionnary_st *dic = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || !name || !name[0] || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY)
+    return;
+  dic = itm->v_payloaddict;
+  if (!dic || dic->dic_len == 0)
+    return;
+  lo = 0;
+  hi = dic->dic_len - 1;
+  while (lo + 1 < hi)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0 && str->v_kind == IACAV_STRING);
+      cmp = strcmp (str->v_str, name);
+      if (!cmp)
+	{
+	  ix = md;
+	  break;
+	}
+      if (cmp < 0)
+	hi = md;
+      else
+	lo = md;
+    };
+  for (md = lo; md <= hi; md++)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0);
+      cmp = strcmp (str->v_str, name);
+      if (!cmp)
+	{
+	  ix = md;
+	  break;
+	}
+    }
+  if (ix < 0)
+    return;
+  for (int j = dic->dic_len - 1; j > ix; j--)
+    dic->dic_tab[j] = dic->dic_tab[j - 1];
+  dic->dic_tab[dic->dic_len - 1].de_str = 0;
+  dic->dic_tab[dic->dic_len - 1].de_val = 0;
+  dic->dic_len--;
+}
 
 /* get a dataspace by its name; dataspaces are never freed */
 struct iacadataspace_st *

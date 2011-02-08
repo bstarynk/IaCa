@@ -396,6 +396,20 @@ struct iacapayloadbuffer_st
   char buf_tab[];		/* buf_siz bytes */
 };
 
+struct iacadictentry_st
+{
+  IacaString *de_str;
+  IacaValue *de_val;
+};
+
+struct iacapayloaddictionnary_st
+{
+  unsigned dic_siz;
+  unsigned dic_len;
+  struct iacadictentry_st dic_tab[];	/* size is dic_siz */
+};
+
+
 /* make an item */
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
 #define iacav_item_make(Sp) ((IacaValue*) iaca_item_make((Sp)))
@@ -491,6 +505,33 @@ extern void iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
   __attribute__ ((format (printf, 2, 3)));
 
 static inline unsigned iaca_item_pay_load_buffer_length (IacaItem *itm);
+
+extern void iaca_item_pay_load_reserve_dictionnary (IacaItem *itm,
+						    unsigned sz);
+
+static inline IacaValue *iaca_item_pay_load_dictionnary_get (IacaItem *itm,
+							     const char
+							     *name);
+
+extern void
+iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
+				    IacaValue *val);
+
+static inline void
+iaca_item_pay_load_put_dictionnary_str (IacaItem *itm, const char *str,
+					IacaValue *val)
+{
+  IacaString *strv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || !str || !str[0]
+      || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY || !val)
+    return;
+  strv = iaca_string_make (str);
+  iaca_item_pay_load_put_dictionnary (itm, strv, val);
+}
+
+extern void
+iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *str);
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
@@ -792,6 +833,45 @@ iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk, IacaValue *val)
     pv->vec_tab[rk] = val;
 }
 
+static inline IacaValue *
+iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
+{
+  int lo = 0, hi = 0, md = 0;
+  struct iacapayloaddictionnary_st *dic = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || !name || !name[0]
+      || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY
+      || (dic = itm->v_payloaddict) == NULL)
+    return NULL;
+  lo = 0;
+  hi = dic->dic_len - 1;
+  while (lo + 1 < hi)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0 && str->v_kind == IACAV_STRING);
+      cmp = strcmp (str->v_str, name);
+      if (!cmp)
+	return dic->dic_tab[md].de_val;
+      if (cmp < 0)
+	hi = md;
+      else
+	lo = md;
+    };
+  for (md = lo; md <= hi; md++)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0);
+      if (!cmp)
+	return dic->dic_tab[md].de_val;
+    }
+  return NULL;
+}
 
 /* in item vitem, get the attribute following a given attribute, or else null */
 static inline IacaValue *
