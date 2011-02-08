@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <setjmp.h>
+#include <ctype.h>
 
 /// system includes
 #include <dlfcn.h>
@@ -483,6 +484,14 @@ extern void iaca_item_pay_load_reserve_buffer (IacaItem *itm, unsigned sz);
 
 extern void iaca_item_pay_load_append_buffer (IacaItem *itm, const char *str);
 
+extern void
+iaca_item_pay_load_append_cencoded_buffer (IacaItem *itm, const char *str);
+
+extern void iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
+  __attribute__ ((format (printf, 2, 3)));
+
+static inline unsigned iaca_item_pay_load_buffer_length (IacaItem *itm);
+
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
 extern struct iaca_st
@@ -730,6 +739,28 @@ iaca_item_pay_load_vector_length (IacaItem *itm)
       || (pv = itm->v_payloadvect) == NULL)
     return 0;
   return pv->vec_len;
+}
+
+static inline unsigned
+iaca_item_pay_load_buffer_length (IacaItem *itm)
+{
+  struct iacapayloadbuffer_st *buf = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (buf = itm->v_payloadbuf) == NULL)
+    return 0;
+  return buf->buf_len;
+}
+
+static inline const char *
+iaca_item_pay_load_buffer_str (IacaItem *itm)
+{
+  struct iacapayloadbuffer_st *buf = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_VECTOR
+      || (buf = itm->v_payloadbuf) == NULL)
+    return NULL;
+  return buf->buf_tab;
 }
 
 static inline IacaValue *

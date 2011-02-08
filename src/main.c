@@ -878,6 +878,113 @@ iaca_item_pay_load_append_buffer (IacaItem *itm, const char *str)
   oldbuf->buf_len = oldlen + slen;
 }
 
+
+void
+iaca_item_pay_load_append_cencoded_buffer (IacaItem *itm, const char *str)
+{
+  if (!itm || itm->v_kind != IACAV_ITEM || !str
+      || itm->v_payloadkind != IACAPAYLOAD_BUFFER)
+    return;
+  for (const char *pc = str; *pc; pc++)
+    {
+      char c = *pc;
+      switch (c)
+	{
+	case '\\':
+	  iaca_item_pay_load_append_buffer (itm, "\\\\");
+	  break;
+	case '\'':
+	  iaca_item_pay_load_append_buffer (itm, "\\\'");
+	  break;
+	case '\"':
+	  iaca_item_pay_load_append_buffer (itm, "\\\"");
+	  break;
+	case '\r':
+	  iaca_item_pay_load_append_buffer (itm, "\\r");
+	  break;
+	case '\n':
+	  iaca_item_pay_load_append_buffer (itm, "\\n");
+	  break;
+	case '\t':
+	  iaca_item_pay_load_append_buffer (itm, "\\t");
+	  break;
+	case '\v':
+	  iaca_item_pay_load_append_buffer (itm, "\\v");
+	  break;
+	case '\f':
+	  iaca_item_pay_load_append_buffer (itm, "\\f");
+	  break;
+	case 'a' ... 'z':
+	case 'A' ... 'Z':
+	case '0' ... '9':
+	case ' ':
+	case '-':
+	case '_':
+	  {
+	    char cbuf[2];
+	    cbuf[0] = c;
+	    cbuf[1] = 0;
+	    iaca_item_pay_load_append_buffer (itm, cbuf);
+	    break;
+	  }
+	default:
+	  if (c > ' ' && isprint (c))
+	    {
+	      char cbuf[2];
+	      cbuf[0] = c;
+	      cbuf[1] = 0;
+	      iaca_item_pay_load_append_buffer (itm, cbuf);
+	    }
+	  else
+	    {
+	      char cbuf[8];
+	      memset (cbuf, 0, sizeof (cbuf));
+	      snprintf (cbuf, sizeof (cbuf) - 1, "\\x%02x", c & 0xff);
+	      iaca_item_pay_load_append_buffer (itm, cbuf);
+	    }
+	}
+    }
+}
+
+
+void
+iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
+{
+  int fmtlen = strlen (fmt);
+  unsigned len = 0;
+  unsigned siz = 0;
+  int pl = 0;
+  struct iacapayloadbuffer_st *buf = 0;
+  va_list args;
+  if (!itm || itm->v_kind != IACAV_ITEM || !fmt
+      || itm->v_payloadkind != IACAPAYLOAD_BUFFER)
+    return;
+  buf = itm->v_payloadbuf;
+  len = buf ? buf->buf_len : 0;
+  siz = buf ? buf->buf_siz : 0;
+  if (!buf || len + 4 * fmtlen + 32 > siz)
+    {
+      iaca_item_pay_load_reserve_buffer (itm, len + 5 * fmtlen + 64);
+      buf = itm->v_payloadbuf;
+      len = buf ? buf->buf_len : 0;
+      siz = buf ? buf->buf_siz : 0;
+    }
+  va_start (args, fmt);
+  pl = vsnprintf (buf->buf_tab + len, siz - len - 3, fmt, args);
+  va_end (args);
+  if (len + pl > siz - 3)
+    {
+      iaca_item_pay_load_reserve_buffer (itm, len + pl + fmtlen + 32);
+      buf = itm->v_payloadbuf;
+      len = buf ? buf->buf_len : 0;
+      siz = buf ? buf->buf_siz : 0;
+      va_start (args, fmt);
+      pl = vsnprintf (buf->buf_tab + len, siz - len - 3, fmt, args);
+      va_end (args);
+    }
+  buf->buf_len += pl;
+}
+
 IacaValue *
 iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 {
