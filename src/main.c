@@ -722,7 +722,7 @@ iaca_item_pay_load_resize_vector (IacaItem *itm, unsigned len)
       || (oldpv = itm->v_payloadvect) == 0)
     {
       struct iacapayloadvector_st *pv = 0;
-      iaca_item_clear_pay_load (itm);
+      iaca_item_pay_load_clear (itm);
       pv =
 	iaca_alloc_data (sizeof (struct iacapayloadvector_st) +
 			 sz * sizeof (IacaValue *));
@@ -766,6 +766,116 @@ iaca_item_pay_load_resize_vector (IacaItem *itm, unsigned len)
 	      sizeof (void *) * (oldpv->vec_siz - len));
       oldpv->vec_len = len;
     }
+}
+
+
+void
+iaca_item_pay_load_append_vector (IacaItem *itm, IacaValue *val)
+{
+  struct iacapayloadvector_st *oldpv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind != IACAPAYLOAD_VECTOR)
+    return;
+  if ((oldpv = itm->v_payloadvect) == 0)
+    {
+      unsigned sz = 7;
+      struct iacapayloadvector_st *pv = 0;
+      iaca_item_pay_load_clear (itm);
+      pv =
+	iaca_alloc_data (sizeof (struct iacapayloadvector_st) +
+			 sz * sizeof (IacaValue *));
+      pv->vec_siz = sz;
+      pv->vec_len = 1;
+      pv->vec_tab[0] = val;
+      itm->v_payloadkind = IACAPAYLOAD_VECTOR;
+      itm->v_payloadvect = pv;
+      return;
+    }
+  else if (oldpv->vec_len + 2 >= oldpv->vec_siz)
+    {
+      iaca_item_pay_load_resize_vector (itm,
+					oldpv->vec_len + 2 +
+					oldpv->vec_len / 8);
+      oldpv = itm->v_payloadvect;
+    }
+  oldpv->vec_tab[oldpv->vec_len++] = val;
+}
+
+
+void
+iaca_item_pay_load_reserve_buffer (IacaItem *itm, unsigned sz)
+{
+  struct iacapayloadbuffer_st *oldbuf = 0;
+  unsigned nsz = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  for (unsigned z = 8 * sizeof (struct iacapayloadbuffer_st); z > 0;
+       z = 2 * z)
+    {
+      unsigned s = z - 2 * sizeof (struct iacapayloadbuffer_st);
+      if (s > sz)
+	{
+	  nsz = s;
+	  break;
+	}
+      s = 3 * sz / 2 - 2 * sizeof (struct iacapayloadbuffer_st);
+      if (s > sz)
+	{
+	  nsz = s;
+	  break;
+	};
+    }
+  if (nsz == 0)
+    iaca_error ("too big buffer size %u", sz);
+  if (itm->v_payloadkind != IACAPAYLOAD_BUFFER)
+    {
+      struct iacapayloadbuffer_st *buf = 0;
+      iaca_item_pay_load_clear (itm);
+      buf = iaca_alloc_atomic (sizeof (buf) + nsz);
+      buf->buf_siz = nsz;
+      buf->buf_len = 0;
+      itm->v_payloadkind = IACAPAYLOAD_BUFFER;
+      itm->v_payloadbuf = buf;
+      return;
+    }
+  oldbuf = itm->v_payloadbuf;
+  if (!oldbuf || oldbuf->buf_siz < nsz)
+    {
+      struct iacapayloadbuffer_st *buf = 0;
+      buf = iaca_alloc_atomic (sizeof (buf) + nsz);
+      if (oldbuf)
+	memcpy (buf->buf_tab, oldbuf->buf_tab, oldbuf->buf_len);
+      buf->buf_siz = nsz;
+      buf->buf_len = oldbuf ? oldbuf->buf_len : 0;
+      itm->v_payloadbuf = buf;
+      if (oldbuf)
+	GC_FREE (oldbuf);
+    }
+}
+
+
+void
+iaca_item_pay_load_append_buffer (IacaItem *itm, const char *str)
+{
+  int slen = 0;
+  unsigned oldlen = 0;
+  struct iacapayloadbuffer_st *oldbuf = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM || !str
+      || itm->v_payloadkind != IACAPAYLOAD_BUFFER)
+    return;
+  slen = strlen (str);
+  oldbuf = itm->v_payloadbuf;
+  oldlen = oldbuf ? oldbuf->buf_len : 0;
+  if (!oldbuf || oldbuf->buf_siz < slen + oldlen + 2)
+    {
+      iaca_item_pay_load_reserve_buffer (itm,
+					 slen + oldlen + oldlen / 16 +
+					 slen / 8 + 10);
+      oldbuf = itm->v_payloadbuf;
+    }
+  memcpy (oldbuf->buf_tab + oldlen, str, slen);
+  oldbuf->buf_len = oldlen + slen;
 }
 
 IacaValue *

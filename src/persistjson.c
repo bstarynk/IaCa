@@ -248,6 +248,46 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
       itm->v_payloadptr = NULL;
       return;
     }
+  else if (json_is_object (js))
+    {
+      const char *kdstr =
+	json_string_value (json_object_get (js, "payloadkind"));
+      if (!strcmp (kdstr, "vector"))
+	{
+	  json_t *jsarr = json_object_get (js, "payloadvector");
+	  int sz = 0;
+	  if (!json_is_array (jsarr))
+	    iaca_json_error_printf (ld, "bad item #%lld vector payload",
+				    (long long) itm->v_ident);
+	  sz = json_array_size (jsarr);
+	  iaca_item_pay_load_resize_vector (itm, sz);
+	  for (int ix = 0; ix < sz; ix++)
+	    iaca_item_pay_load_append_vector (itm,
+					      iaca_json_to_value (ld,
+								  json_array_get
+								  (jsarr,
+								   ix)));
+	}
+      else if (!strcmp (kdstr, "buffer"))
+	{
+	  int ln = json_integer_value (json_object_get (js, "payloadbuflen"));
+	  json_t *jsarr = json_object_get (js, "payloadbuffer");
+	  int sz = 0;
+	  iaca_item_pay_load_reserve_buffer (itm, ln + 2);
+	  if (!json_is_array (jsarr))
+	    iaca_json_error_printf (ld, "bad item #%lld buffer payload",
+				    (long long) itm->v_ident);
+	  sz = json_array_size (jsarr);
+	  for (int ix = 0; ix < sz; ix++)
+	    {
+	      if (ix > 0)
+		iaca_item_pay_load_append_buffer (itm, "\n");
+	      iaca_item_pay_load_append_buffer (itm,
+						json_string_value
+						(json_array_get (jsarr, ix)));
+	    }
+	}
+    }
 #warning iaca_load_item_pay_load incomplete
 }
 
@@ -658,6 +698,7 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
 json_t *
 iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 {
+  json_t *js = 0;
   if (!du || !itm)
     return NULL;
   g_assert (du->du_magic == IACA_DUMPER_MAGIC);
@@ -668,7 +709,6 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
       return json_null ();
     case IACAPAYLOAD_VECTOR:
       {
-	json_t *js = 0;
 	json_t *jsarr = json_array ();
 	unsigned ln = iaca_item_pay_load_vector_length (itm);
 	for (unsigned ix = 0; ix < ln; ix++)
@@ -677,9 +717,40 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 						       iaca_item_pay_load_nth_vector
 						       (itm, ix)));
 	js = json_object ();
+	json_object_set (js, "payloadkind", json_string ("vector"));
+	json_object_set (js, "payloadvector", jsarr);
+	return js;
+      }
+    case IACAPAYLOAD_BUFFER:
+      {
+	json_t *jsarr = json_array ();
+	struct iacapayloadbuffer_st *buf = itm->v_payloadbuf;
+	char *bstr = buf ? buf->buf_tab : 0;
+	unsigned blen = buf ? buf->buf_len : 0;
+	char *s = bstr;
+	while (s)
+	  {
+	    char *eol = strchr (s, '\n');
+	    if (eol)
+	      {
+		*eol = 0;
+		json_array_append_new (jsarr, json_string (s));
+		s = eol + 1;
+	      }
+	    else
+	      {
+		json_array_append_new (jsarr, json_string (s));
+		s = 0;
+		break;
+	      }
+	  }
+	js = json_object ();
+	json_object_set (js, "payloadkind", json_string ("buffer"));
+	json_object_set (js, "payloadbuflen", json_integer (blen));
+	json_object_set (js, "payloadbuffer", jsarr);
+	return js;
       }
     case IACAPAYLOAD_DICTIONNARY:
-#warning iaca_dump_item_pay_load_json incomplete, maybe should get containing json as argument
       iaca_error ("unimplemented iaca_dump_item_payload_json");
     }
 }

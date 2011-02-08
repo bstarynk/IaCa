@@ -346,6 +346,7 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 enum iacapayloadkind_en
 {
   IACAPAYLOAD__NONE,
+  IACAPAYLOAD_BUFFER,
   IACAPAYLOAD_VECTOR,
   IACAPAYLOAD_DICTIONNARY,
 };
@@ -373,6 +374,7 @@ struct iacaitem_st
   union
   {
     void *v_payloadptr;		/* null when IACAPAYLOAD__NONE */
+    struct iacapayloadbuffer_st *v_payloadbuf;	/* when IACAPAYLOAD_BUFFER */
     struct iacapayloadvector_st *v_payloadvect;	/* when IACAPAYLOAD_VECTOR */
     struct iacapayloaddictionnary_st *v_payloaddict;	/* when IACAPAYLOAD_DICTIONNARY */
   };
@@ -384,6 +386,13 @@ struct iacapayloadvector_st
   unsigned vec_len;		/* used length */
   IacaValue *vec_tab[];		/* vec_siz pointers, only the first
 				   vec_len are used */
+};
+
+struct iacapayloadbuffer_st
+{
+  unsigned buf_siz;		/* allocated size */
+  unsigned buf_len;		/* used length */
+  char buf_tab[];		/* buf_siz bytes */
 };
 
 /* make an item */
@@ -456,7 +465,7 @@ static inline int iaca_item_number_attributes (IacaValue *vitem);
 
 static inline enum iacapayloadkind_en iaca_item_pay_load_kind (IacaItem *itm);
 
-static inline void iaca_item_clear_pay_load (IacaItem *itm);
+static inline void iaca_item_pay_load_clear (IacaItem *itm);
 
 extern void iaca_item_pay_load_resize_vector (IacaItem *itm, unsigned sz);
 
@@ -467,6 +476,12 @@ static inline IacaValue *iaca_item_pay_load_nth_vector (IacaItem *itm,
 
 static inline void iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk,
 						      IacaValue *val);
+
+extern void iaca_item_pay_load_append_vector (IacaItem *itm, IacaValue *val);
+
+extern void iaca_item_pay_load_reserve_buffer (IacaItem *itm, unsigned sz);
+
+extern void iaca_item_pay_load_append_buffer (IacaItem *itm, const char *str);
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
@@ -697,7 +712,7 @@ iaca_item_pay_load_kind (IacaItem *itm)
 }
 
 static inline void
-iaca_item_clear_pay_load (IacaItem *itm)
+iaca_item_pay_load_clear (IacaItem *itm)
 {
   if (!itm || itm->v_kind != IACAV_ITEM)
     return;
@@ -746,8 +761,6 @@ iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk, IacaValue *val)
     pv->vec_tab[rk] = val;
 }
 
-static inline void iaca_item_pay_load_put_nth_vector (IacaItem *itm, int rk,
-						      IacaValue *val);
 
 /* in item vitem, get the attribute following a given attribute, or else null */
 static inline IacaValue *
