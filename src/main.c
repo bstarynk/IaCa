@@ -1046,6 +1046,92 @@ iaca_item_pay_load_reserve_dictionnary (IacaItem *itm, unsigned sz)
 }
 
 
+void
+iaca_item_pay_load_make_queue (IacaItem *itm)
+{
+  struct iacapayloadqueue_st *que = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind == IACAPAYLOAD_QUEUE)
+    return;
+  iaca_item_pay_load_clear (itm);
+  que = iaca_alloc_data (sizeof (struct iacapayloadqueue_st));
+  que->que_len = 0;
+  que->que_first = que->que_last = NULL;
+  itm->v_payloadkind = IACAPAYLOAD_QUEUE;
+  itm->v_payloadqueue = que;
+}
+
+void
+iaca_item_pay_load_queue_prepend (IacaItem *itm, IacaValue *val)
+{
+  struct iacapayloadqueue_st *que = 0;
+  struct iacaqueuelink_st *lnk = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind != IACAPAYLOAD_QUEUE
+      || (que = itm->v_payloadqueue) == NULL)
+    return;
+  if (que->que_len == 0)
+    {
+      lnk = iaca_alloc_data (sizeof (struct iacaqueuelink_st));
+      lnk->ql_prev = 0;
+      lnk->ql_next = 0;
+      lnk->ql_val = val;
+      que->que_first = lnk;
+      que->que_last = lnk;
+      que->que_len = 1;
+      return;
+    }
+  else
+    {
+      struct iacaqueuelink_st *lnkfirst = que->que_first;
+      g_assert (lnkfirst != NULL);
+      g_assert (lnkfirst->ql_prev == NULL);
+      lnk = iaca_alloc_data (sizeof (struct iacaqueuelink_st));
+      lnk->ql_prev = 0;
+      lnk->ql_next = lnkfirst;
+      lnkfirst->ql_prev = lnk;
+      que->que_first = lnk;
+      que->que_len++;
+    }
+}
+
+void
+iaca_item_pay_load_queue_append (IacaItem *itm, IacaValue *val)
+{
+  struct iacapayloadqueue_st *que = 0;
+  struct iacaqueuelink_st *lnk = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind != IACAPAYLOAD_QUEUE
+      || (que = itm->v_payloadqueue) == NULL)
+    return;
+  if (que->que_len == 0)
+    {
+      lnk = iaca_alloc_data (sizeof (struct iacaqueuelink_st));
+      lnk->ql_prev = 0;
+      lnk->ql_next = 0;
+      lnk->ql_val = val;
+      que->que_first = lnk;
+      que->que_last = lnk;
+      que->que_len = 1;
+      return;
+    }
+  else
+    {
+      struct iacaqueuelink_st *lnklast = que->que_last;
+      g_assert (lnklast != NULL);
+      g_assert (lnklast->ql_next == NULL);
+      lnk = iaca_alloc_data (sizeof (struct iacaqueuelink_st));
+      lnk->ql_prev = lnklast;
+      lnk->ql_next = 0;
+      lnklast->ql_next = lnk;
+      que->que_last = lnk;
+      que->que_len++;
+    }
+}
+
 IacaValue *
 iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 {

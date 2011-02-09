@@ -350,6 +350,7 @@ enum iacapayloadkind_en
   IACAPAYLOAD_BUFFER,
   IACAPAYLOAD_VECTOR,
   IACAPAYLOAD_DICTIONNARY,
+  IACAPAYLOAD_QUEUE,
 };
 
 /* Item structure; each has a unique 64 bits identifying unique
@@ -378,6 +379,7 @@ struct iacaitem_st
     struct iacapayloadbuffer_st *v_payloadbuf;	/* when IACAPAYLOAD_BUFFER */
     struct iacapayloadvector_st *v_payloadvect;	/* when IACAPAYLOAD_VECTOR */
     struct iacapayloaddictionnary_st *v_payloaddict;	/* when IACAPAYLOAD_DICTIONNARY */
+    struct iacapayloadqueue_st *v_payloadqueue;	/* when IACAPAYLOAD_QUEUE */
   };
 };
 
@@ -407,6 +409,20 @@ struct iacapayloaddictionnary_st
   unsigned dic_siz;
   unsigned dic_len;
   struct iacadictentry_st dic_tab[];	/* size is dic_siz */
+};
+
+struct iacaqueuelink_st
+{
+  struct iacaqueuelink_st *ql_prev;
+  struct iacaqueuelink_st *ql_next;
+  IacaValue *ql_val;
+};
+
+struct iacapayloadqueue_st
+{
+  unsigned que_len;
+  struct iacaqueuelink_st *que_first;
+  struct iacaqueuelink_st *que_last;
 };
 
 
@@ -532,6 +548,50 @@ iaca_item_pay_load_put_dictionnary_str (IacaItem *itm, const char *str,
 
 extern void
 iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *str);
+
+extern void iaca_item_pay_load_make_queue (IacaItem *itm);
+
+extern void iaca_item_pay_load_queue_prepend (IacaItem *itm, IacaValue *val);
+
+extern void iaca_item_pay_load_queue_append (IacaItem *itm, IacaValue *val);
+
+
+static inline IacaValue *
+iaca_item_pay_load_queue_first (IacaItem *itm)
+{
+  struct iacapayloadqueue_st *que = 0;
+  struct iacaqueuelink_st *lnkfirst = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (itm->v_payloadkind != IACAPAYLOAD_QUEUE
+      || (que = itm->v_payloadqueue) == NULL)
+    return NULL;
+  if (que->que_len == 0)
+    return NULL;
+  lnkfirst = que->que_first;
+  g_assert (lnkfirst != NULL);
+  g_assert (lnkfirst->ql_prev == NULL);
+  return lnkfirst->ql_val;
+}
+
+
+static inline IacaValue *
+iaca_item_pay_load_queue_last (IacaItem *itm)
+{
+  struct iacapayloadqueue_st *que = 0;
+  struct iacaqueuelink_st *lnklast = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (itm->v_payloadkind != IACAPAYLOAD_QUEUE
+      || (que = itm->v_payloadqueue) == NULL)
+    return NULL;
+  if (que->que_len == 0)
+    return NULL;
+  lnklast = que->que_last;
+  g_assert (lnklast != NULL);
+  g_assert (lnklast->ql_next == NULL);
+  return lnklast->ql_val;
+}
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */
