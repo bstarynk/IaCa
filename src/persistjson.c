@@ -300,8 +300,24 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 								 (jsarr,
 								  ix)));
 	}
+      else if (!strcmp (kdstr, "dictionnary"))
+	{
+	  int ln = json_integer_value (json_object_get (js, "payloaddictlen"));
+	  json_t *jsdict = json_object_get (js, "payloaddictionnary");
+	  iaca_item_pay_load_reserve_dictionnary(itm, ln+ln/8+5);
+	  for (void* iter = json_object_iter(jsdict); 
+	       iter; iter=json_object_iter_next(jsdict, iter))
+	    {
+	      json_t* jsval = json_object_iter_value(iter);
+	      const char* key = json_object_iter_key(iter);
+	      IacaValue* val = iaca_json_to_value(ld, jsval);
+	      if (key && val)
+		iaca_item_pay_load_put_dictionnary_str (itm, key, val);
+	    }
+	}
+      else
+	iaca_json_error_printf(ld, "unexepected payload kind %s", kdstr);
     }
-#warning iaca_load_item_pay_load incomplete
 }
 
 
@@ -777,7 +793,23 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 	return js;
       }
     case IACAPAYLOAD_DICTIONNARY:
-      iaca_error ("unimplemented iaca_dump_item_payload_json");
+      {
+	struct iacapayloaddictionnary_st *dic = itm->v_payloaddict;
+	json_t *jsdic = json_object ();
+	unsigned len = dic?dic->dic_len:0;
+	for (unsigned ix=0; ix<len; ix++) {
+	  IacaString* nam = dic->dic_tab[ix].de_str;
+	  IacaValue* val = dic->dic_tab[ix].de_val;
+	  if (!nam || !val) continue;
+	  json_object_set(jsdic, nam->v_str, 
+			  iaca_dump_value_json (du, val));
+	}
+	js = json_object ();
+	json_object_set (js, "payloadkind", json_string ("dictionnary"));
+	json_object_set (js, "payloaddictlen", json_integer(len));
+	json_object_set (js, "payloaddictionnary", jsdic);
+	return js;
+      }
     }
   return 0;
 }
