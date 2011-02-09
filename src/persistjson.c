@@ -287,6 +287,19 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 						(json_array_get (jsarr, ix)));
 	    }
 	}
+      else if (!strcmp (kdstr, "queue"))
+	{
+	  int sz = 0;
+	  json_t *jsarr = json_object_get (js, "payloadqueue");
+	  iaca_item_pay_load_make_queue (itm);
+	  sz = json_array_size (jsarr);
+	  for (int ix = 0; ix < sz; ix++)
+	    iaca_item_pay_load_queue_append (itm,
+					     iaca_json_to_value (ld,
+								 json_array_get
+								 (jsarr,
+								  ix)));
+	}
     }
 #warning iaca_load_item_pay_load incomplete
 }
@@ -750,9 +763,23 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 	json_object_set (js, "payloadbuffer", jsarr);
 	return js;
       }
+    case IACAPAYLOAD_QUEUE:
+      {
+	struct iacapayloadqueue_st *que = itm->v_payloadqueue;
+	json_t *jsarr = json_array ();
+	for (struct iacaqueuelink_st * lnk = que ? que->que_first : 0;
+	     lnk; lnk = lnk->ql_next)
+	  json_array_append_new (jsarr,
+				 iaca_dump_value_json (du, lnk->ql_val));
+	js = json_object ();
+	json_object_set (js, "payloadkind", json_string ("queue"));
+	json_object_set (js, "payloadqueue", jsarr);
+	return js;
+      }
     case IACAPAYLOAD_DICTIONNARY:
       iaca_error ("unimplemented iaca_dump_item_payload_json");
     }
+  return 0;
 }
 
 json_t *
