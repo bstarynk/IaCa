@@ -1323,13 +1323,22 @@ iaca_dataspace (const char *name)
   return dsp;
 }
 
+static GOptionEntry iaca_options[] = {
+  {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
+   "state directory with data and code", "STATEDIR"},
+  {NULL}
+};
+
 int
 main (int argc, char **argv)
 {
+  GError *err = NULL;
   GC_INIT ();
-  gtk_init (&argc, &argv);
+  iaca.ia_statedir = ".";
+  if (!gtk_init_with_args
+      (&argc, &argv, "{iaca system}", iaca_options, NULL, &err))
+    iaca_error ("failed to initialize iaca %s", err ? err->message : "");
   /* we force GC friendship in GTK & GLIB! */
   g_mem_gc_friendly = TRUE;
-#warning temporary load current directory
-  iaca_load (".");
+  iaca_load (iaca.ia_statedir);
 }

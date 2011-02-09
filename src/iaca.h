@@ -603,6 +603,8 @@ extern struct iaca_st
   GHashTable *ia_dataspace_htab;
   /* last item identifier */
   int64_t ia_item_last_ident;
+  /* the state directory */
+  char *ia_statedir;
 } iaca;
 /*****************************************************************************
  *****************************************************************************
