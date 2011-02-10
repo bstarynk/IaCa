@@ -30,7 +30,7 @@ OBJECTFILES=$(patsubst %.c,%.o,$(SOURCEFILES))
 all: iaca
 
 iaca: $(OBJECTFILES)
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBES)
+	$(CC) -rdynamic $(CFLAGS) $^ -o $@ $(LIBES)
 
 $(OBJECTFILES): src/iaca.h
 
