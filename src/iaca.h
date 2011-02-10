@@ -433,18 +433,19 @@ struct iacaclofun_st
 {
   /* the signature is a short string uniquely defining the signature,
      that is the argument and result types, of the function */
-  const char* cfun_sig;
+  const char *cfun_sig;
   const unsigned cfun_nbval;
-  union {
-    void* cfun_ptr;
+  union
+  {
+    void *cfun_ptr;
   };
   const char cfun_name[];
 };
 
 struct iacapayloadclosure_st
 {
-  struct iacaclofun_st* clo_fun;
-  IacaValue* clo_valtab[];	/* size is given by cfun_nbval of clo_fun */
+  struct iacaclofun_st *clo_fun;
+  IacaValue *clo_valtab[];	/* size is given by cfun_nbval of clo_fun */
 };
 
 /* make an item */

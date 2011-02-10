@@ -1323,28 +1323,31 @@ iaca_dataspace (const char *name)
   return dsp;
 }
 
-struct iacaclofun_st* iaca_find_clofun(const char*name)
+struct iacaclofun_st *
+iaca_find_clofun (const char *name)
 {
-  struct iacaclofun_st* cf = 0;
-  gchar* s = 0;
+  struct iacaclofun_st *cf = 0;
+  gchar *s = 0;
   gpointer ptr = 0;
-  if (!name || !name[0]) return NULL;
-  if (!iaca.ia_clofun_htab) 
-    iaca.ia_clofun_htab = g_hash_table_new(g_str_hash, g_str_equal);
-  cf = (struct iacaclofun_st*) g_hash_table_lookup(iaca.ia_clofun_htab,
-						   (gpointer)name);
-  if (cf) 
+  if (!name || !name[0])
+    return NULL;
+  if (!iaca.ia_clofun_htab)
+    iaca.ia_clofun_htab = g_hash_table_new (g_str_hash, g_str_equal);
+  cf = (struct iacaclofun_st *) g_hash_table_lookup (iaca.ia_clofun_htab,
+						     (gpointer) name);
+  if (cf)
     return cf;
-  s = g_strdup_printf("iacacfun_%s", name);
-  if (!g_module_symbol (iaca.ia_progmodule, s, &ptr) || !ptr) {
-    iaca_warning ("not found %s - %s", s, g_module_error());
-    g_free(s);
-    return 0;
-  }
-  iaca_debug("found %s at %p", s, ptr);
-  g_hash_table_insert(iaca.ia_clofun_htab, s, ptr);
-  cf = (struct iacaclofun_st*) ptr;
-  g_assert (!strcmp(cf->cfun_name, name));
+  s = g_strdup_printf ("iacacfun_%s", name);
+  if (!g_module_symbol (iaca.ia_progmodule, s, &ptr) || !ptr)
+    {
+      iaca_warning ("not found %s - %s", s, g_module_error ());
+      g_free (s);
+      return 0;
+    }
+  iaca_debug ("found %s at %p", s, ptr);
+  g_hash_table_insert (iaca.ia_clofun_htab, s, ptr);
+  cf = (struct iacaclofun_st *) ptr;
+  g_assert (!strcmp (cf->cfun_name, name));
   /* don't free because it is inserted! */
   return ptr;
 }
@@ -1366,8 +1369,8 @@ main (int argc, char **argv)
     iaca_error ("failed to initialize iaca %s", err ? err->message : "");
   /* we force GC friendship in GTK & GLIB! */
   g_mem_gc_friendly = TRUE;
-  iaca.ia_progmodule = g_module_open(NULL, 0);
-    if (!iaca.ia_progmodule) 
-      iaca_error("failed to get full program module %s", g_module_error());
+  iaca.ia_progmodule = g_module_open (NULL, 0);
+  if (!iaca.ia_progmodule)
+    iaca_error ("failed to get full program module %s", g_module_error ());
   iaca_load (iaca.ia_statedir);
 }
