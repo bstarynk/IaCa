@@ -322,13 +322,18 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	{
 	  const char *funam
 	    = json_string_value (json_object_get (js, "payloadclofun"));
+	  json_t *jsarr = json_object_get (js, "payloadcloval");
 	  const struct iacaclofun_st *cfun = iaca_find_clofun (funam);
+	  int ln = json_array_size (jsarr);
 	  if (!cfun)
 	    iaca_json_error_printf
 	      (ld,
 	       "not found function %s for closure payload of #%lld",
 	       funam, (long long) itm->v_ident);
-#warning iaca_load_item_pay_load incomplete for closure
+	  iaca_item_pay_load_make_closure (itm, cfun, NULL);
+	  for (int ix = 0; ix < ln; ix++)
+	    iaca_item_pay_load_closure_set_nth
+	      (itm, ix, iaca_json_to_value (ld, json_array_get (jsarr, ix)));
 	}
       else
 	iaca_json_error_printf (ld, "unexepected payload kind %s", kdstr);
