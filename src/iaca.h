@@ -426,6 +426,27 @@ struct iacapayloadqueue_st
 };
 
 
+/* closure function structures are always const and statically
+   allocated, that is in text segment. A clofun whose cfun_name is FOO
+   is named iacacfun_FOO */
+struct iacaclofun_st
+{
+  /* the signature is a short string uniquely defining the signature,
+     that is the argument and result types, of the function */
+  const char* cfun_sig;
+  const unsigned cfun_nbval;
+  union {
+    void* cfun_ptr;
+  };
+  const char cfun_name[];
+};
+
+struct iacapayloadclosure_st
+{
+  struct iacaclofun_st* clo_fun;
+  IacaValue* clo_valtab[];	/* size is given by cfun_nbval of clo_fun */
+};
+
 /* make an item */
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
 #define iacav_item_make(Sp) ((IacaValue*) iaca_item_make((Sp)))
@@ -597,10 +618,15 @@ iaca_item_pay_load_queue_last (IacaItem *itm)
 /* the structure describing the entire state of the IaCa system */
 extern struct iaca_st
 {
+  /* the topmost module for the whole program */
+  GModule *ia_progmodule;
   /* hashtable of modules */
   GHashTable *ia_module_htab;
   /* hashtable of data spaces */
   GHashTable *ia_dataspace_htab;
+  /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
+     strings */
+  GHashTable *ia_clofun_htab;
   /* last item identifier */
   int64_t ia_item_last_ident;
   /* the state directory */
