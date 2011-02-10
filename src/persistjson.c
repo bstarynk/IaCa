@@ -51,6 +51,8 @@ struct iacadumper_st
   GQueue *du_scanqueue;
   /* the hash table of already scanned items */
   GHashTable *du_itemhtab;
+  /* the currently scanned item */
+  IacaItem *du_curitem;
 };
 
 
@@ -367,6 +369,9 @@ iaca_load_item_content (struct iacaloader_st *ld, json_t *js)
       atitm = iaca_retrieve_loaded_item (ld, atid);
       iaca_item_physical_put ((IacaValue *) itm, (IacaValue *) atitm, val);
     }
+  itm->v_itemcontent = iaca_json_to_value (ld,
+					   json_object_get (js,
+							    "itemcontent"));
   iaca_load_item_pay_load (ld, itm, json_object_get (js, "itempayload"));
 }
 
@@ -598,6 +603,97 @@ iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem *itm)
   if (g_hash_table_lookup (du->du_itemhtab, itm))
     return false;
   return true;
+}
+
+// forward declaration
+void iaca_dump_scan_value (struct iacadumper_st *du, IacaValue *val);
+
+// scan the content of an item
+void
+iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
+{
+  if (!du || !itm)
+    return;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (itm->v_kind == IACAV_ITEM);
+  if (itm->v_itemcontent)
+    iaca_dump_scan_value (du, itm->v_itemcontent);
+  if (itm->v_attrtab)
+    {
+      IACA_FOREACH_ITEM_ATTRIBUTE_LOCAL ((IacaValue *) itm, vattr)
+      {
+	IacaItem *itattr = (IacaItem *) vattr;
+	IacaValue *val = 0;
+	g_assert (itattr->v_kind == IACAV_ITEM);
+	if (iaca_dump_item_is_transient (du, itattr))
+	  continue;
+	val = iaca_item_attribute_physical_get ((IacaValue *) itm, vattr);
+	(void) iaca_dump_queue_item (du, itattr);
+	iaca_dump_scan_value (du, val);
+      }
+    }
+  switch (itm->v_payloadkind)
+    {
+    case IACAPAYLOAD__NONE:
+      break;
+    case IACAPAYLOAD_VECTOR:
+      {
+	unsigned ln = iaca_item_pay_load_vector_length (itm);
+	for (unsigned ix = 0; ix < ln; ix++)
+	  iaca_dump_scan_value (du, iaca_item_pay_load_nth_vector (itm, ix));
+	break;
+      }
+    case IACAPAYLOAD_BUFFER:
+      break;
+    case IACAPAYLOAD_QUEUE:
+      {
+	struct iacapayloadqueue_st *que = itm->v_payloadqueue;
+	for (struct iacaqueuelink_st * lnk = que ? que->que_first : 0;
+	     lnk; lnk = lnk->ql_next)
+	  iaca_dump_scan_value (du, lnk->ql_val);
+	break;
+      }
+    case IACAPAYLOAD_DICTIONNARY:
+      {
+	struct iacapayloaddictionnary_st *dic = itm->v_payloaddict;
+	unsigned len = dic ? dic->dic_len : 0;
+	for (unsigned ix = 0; ix < len; ix++)
+	  {
+	    IacaString *nam = dic->dic_tab[ix].de_str;
+	    IacaValue *val = dic->dic_tab[ix].de_val;
+	    if (!nam || !val)
+	      continue;
+	    iaca_dump_scan_value (du, val);
+	  }
+	break;
+      }
+    }
+}
+
+
+
+
+// the main scanning loop 
+void
+iaca_dump_scan_loop (struct iacadumper_st *du)
+{
+  if (!du)
+    return;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (du->du_scanqueue);
+  g_assert (du->du_itemhtab);
+  while (!g_queue_is_empty (du->du_scanqueue))
+    {
+      IacaItem *itm = (IacaItem *) g_queue_pop_head (du->du_scanqueue);
+      if (itm)
+	{
+	  du->du_curitem = itm;
+	  iaca_dump_scan_item_content (du, itm);
+	  du->du_curitem = NULL;
+	}
+    }
+  g_queue_free (du->du_scanqueue);
+  du->du_scanqueue = 0;
 }
 
 // recursive routine to scan a data for dumping
@@ -850,6 +946,8 @@ iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
     jsentry = NULL;
   }
   json_object_set (js, "itemattrs", jsattr);
+  json_object_set (js, "itemcontent",
+		   iaca_dump_value_json (du, itm->v_itemcontent));
   json_object_set (js, "itempayload", iaca_dump_item_pay_load_json (du, itm));
   return js;
 }
