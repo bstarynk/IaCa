@@ -351,6 +351,7 @@ enum iacapayloadkind_en
   IACAPAYLOAD_VECTOR,
   IACAPAYLOAD_DICTIONNARY,
   IACAPAYLOAD_QUEUE,
+  IACAPAYLOAD_CLOSURE,
 };
 
 /* Item structure; each has a unique 64 bits identifying unique
@@ -380,6 +381,7 @@ struct iacaitem_st
     struct iacapayloadvector_st *v_payloadvect;	/* when IACAPAYLOAD_VECTOR */
     struct iacapayloaddictionnary_st *v_payloaddict;	/* when IACAPAYLOAD_DICTIONNARY */
     struct iacapayloadqueue_st *v_payloadqueue;	/* when IACAPAYLOAD_QUEUE */
+    struct iacapayloadclosure_st *v_payloadclosure;	/* when IACAPAYLOAD_CLOSURE */
   };
 };
 
@@ -441,6 +443,8 @@ struct iacaclofun_st
   };
   const char cfun_name[];
 };
+
+extern const struct iacaclofun_st *iaca_find_clofun (const char *name);
 
 struct iacapayloadclosure_st
 {
@@ -614,6 +618,10 @@ iaca_item_pay_load_queue_last (IacaItem *itm)
   g_assert (lnklast->ql_next == NULL);
   return lnklast->ql_val;
 }
+
+extern void iaca_item_pay_load_make_closure (IacaItem *itm,
+					     const struct iacaclofun_st
+					     *cfun);
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */

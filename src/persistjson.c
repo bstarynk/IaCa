@@ -318,6 +318,18 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 		iaca_item_pay_load_put_dictionnary_str (itm, key, val);
 	    }
 	}
+      else if (!strcmp (kdstr, "closure"))
+	{
+	  const char *funam
+	    = json_string_value (json_object_get (js, "payloadclofun"));
+	  const struct iacaclofun_st *cfun = iaca_find_clofun (funam);
+	  if (!cfun)
+	    iaca_json_error_printf
+	      (ld,
+	       "not found function %s for closure payload of #%lld",
+	       funam, (long long) itm->v_ident);
+#warning iaca_load_item_pay_load incomplete for closure
+	}
       else
 	iaca_json_error_printf (ld, "unexepected payload kind %s", kdstr);
     }
@@ -673,6 +685,14 @@ iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
 	  }
 	break;
       }
+    case IACAPAYLOAD_CLOSURE:
+      {
+	struct iacapayloadclosure_st *clo = itm->v_payloadclosure;
+	unsigned len = (clo && clo->clo_fun) ? clo->clo_fun->cfun_nbval : 0;
+	for (unsigned ix = 0; ix < len; ix++)
+	  iaca_dump_scan_value (du, clo->clo_valtab[ix]);
+	break;
+      }
     }
 }
 
@@ -914,6 +934,29 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 	json_object_set (js, "payloaddictlen", json_integer (len));
 	json_object_set (js, "payloaddictionnary", jsdic);
 	return js;
+      }
+    case IACAPAYLOAD_CLOSURE:
+      {
+	struct iacapayloadclosure_st *clo = itm->v_payloadclosure;
+	const struct iacaclofun_st *cfun = 0;
+	if (clo && (cfun = clo->clo_fun) != NULL)
+	  {
+	    unsigned len = cfun->cfun_nbval;
+	    json_t *jsarr = json_array ();
+	    js = json_object ();
+	    json_object_set (js, "payloadkind", json_string ("closure"));
+	    json_object_set (js, "payloadclofun",
+			     json_string (cfun->cfun_name));
+	    for (unsigned ix = 0; ix < len; ix++)
+	      json_array_append_new (jsarr,
+				     iaca_dump_value_json (du,
+							   clo->
+							   clo_valtab[ix]));
+	    json_object_set (js, "payloadcloval", jsarr);
+	    return js;
+	  }
+	else
+	  return json_null ();
       }
     }
   return 0;

@@ -1323,7 +1323,7 @@ iaca_dataspace (const char *name)
   return dsp;
 }
 
-struct iacaclofun_st *
+const struct iacaclofun_st *
 iaca_find_clofun (const char *name)
 {
   struct iacaclofun_st *cf = 0;
@@ -1352,6 +1352,13 @@ iaca_find_clofun (const char *name)
   return ptr;
 }
 
+void
+iaca_item_pay_load_make_closure (IacaItem *itm,
+				 const struct iacaclofun_st *cfun)
+{
+#warning iaca_item_pay_load_make_closure unimplemented
+}
+
 static GOptionEntry iaca_options[] = {
   {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
    "state directory with data and code", "STATEDIR"},
@@ -1366,11 +1373,11 @@ main (int argc, char **argv)
   iaca.ia_statedir = ".";
   if (!gtk_init_with_args
       (&argc, &argv, "{iaca system}", iaca_options, NULL, &err))
-    iaca_error ("failed to initialize iaca %s", err ? err->message : "");
+    iaca_error ("failed to initialize iaca - %s", err ? err->message : "");
   /* we force GC friendship in GTK & GLIB! */
   g_mem_gc_friendly = TRUE;
   iaca.ia_progmodule = g_module_open (NULL, 0);
   if (!iaca.ia_progmodule)
-    iaca_error ("failed to get full program module %s", g_module_error ());
+    iaca_error ("failed to get full program module - %s", g_module_error ());
   iaca_load (iaca.ia_statedir);
 }
