@@ -514,6 +514,7 @@ iaca_load (const char *dirpath)
   char *line = 0;
   size_t siz = 0;
   FILE *fil = 0;
+  long long topdictnum = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
   manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
@@ -556,6 +557,10 @@ iaca_load (const char *dirpath)
 	    iaca_error ("data file %s does not exist", datapath);
 	  iaca_load_data (&ld, datapath, name);
 	}
+      else if (sscanf (line, " IACATOPDICT %lld", &topdictnum))
+	{
+#warning should set the toplevel dictionary
+	}
     }
 }
 
@@ -587,6 +592,7 @@ iaca_dump_queue_item (struct iacadumper_st *du, IacaItem *itm)
   if (!itm->v_dataspace)
     return true;
   g_queue_push_tail (du->du_scanqueue, (gpointer) itm);
+  g_hash_table_insert (du->du_itemhtab, (gpointer) itm, (gpointer) itm);
   return false;
 }
 
@@ -950,4 +956,26 @@ iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
 		   iaca_dump_value_json (du, itm->v_itemcontent));
   json_object_set (js, "itempayload", iaca_dump_item_pay_load_json (du, itm));
   return js;
+}
+
+void
+iaca_dump (const char *dirpath)
+{
+  struct iacadumper_st dum;
+  memset (&dum, 0, sizeof (dum));
+  if (!dirpath || !dirpath[0])
+    dirpath = iaca.ia_statedir;
+  if (!g_file_test (dirpath, G_FILE_TEST_IS_DIR))
+    {
+      if (g_mkdir_with_parents (dirpath, 0600))
+	iaca_error ("failed to create dump directory %s - %m", dirpath);
+    };
+  dum.du_magic = IACA_DUMPER_MAGIC;
+  dum.du_scanqueue = g_queue_new ();
+  dum.du_itemhtab = g_hash_table_new (g_direct_hash, g_direct_equal);
+  dum.du_curitem = NULL;
+  (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
+  iaca_dump_scan_loop (&dum);
+  /* should write the data files, and call the hook to write the code files */
+#warning incomplete iaca_dump
 }

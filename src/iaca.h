@@ -605,6 +605,8 @@ extern struct iaca_st
   int64_t ia_item_last_ident;
   /* the state directory */
   char *ia_statedir;
+  /* the toplevel dictionnary */
+  IacaItem *ia_topdictitm;
 } iaca;
 /*****************************************************************************
  *****************************************************************************
@@ -1086,7 +1088,11 @@ struct iacadataspace_st
 
 struct iacadataspace_st *iaca_dataspace (const char *name);
 
+/* load the entire state from a directory */
 void iaca_load (const char *dirpath);
+
+/* dump the entire state into a directory */
+void iaca_dump (const char *dirpath);
 
 /* load a [binary] module of a given name which should contain only
    letters from A-Z a-z, digits 0-9 or underscore _. Returns NULL on
