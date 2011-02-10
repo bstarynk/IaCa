@@ -950,8 +950,8 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 	    for (unsigned ix = 0; ix < len; ix++)
 	      json_array_append_new (jsarr,
 				     iaca_dump_value_json (du,
-							   clo->
-							   clo_valtab[ix]));
+							   clo->clo_valtab
+							   [ix]));
 	    json_object_set (js, "payloadcloval", jsarr);
 	    return js;
 	  }

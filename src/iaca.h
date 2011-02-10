@@ -448,7 +448,7 @@ extern const struct iacaclofun_st *iaca_find_clofun (const char *name);
 
 struct iacapayloadclosure_st
 {
-  struct iacaclofun_st *clo_fun;
+  const struct iacaclofun_st *clo_fun;
   IacaValue *clo_valtab[];	/* size is given by cfun_nbval of clo_fun */
 };
 
@@ -619,9 +619,52 @@ iaca_item_pay_load_queue_last (IacaItem *itm)
   return lnklast->ql_val;
 }
 
-extern void iaca_item_pay_load_make_closure (IacaItem *itm,
-					     const struct iacaclofun_st
-					     *cfun);
+extern void
+iaca_item_pay_load_make_closure (IacaItem *itm,
+				 const struct iacaclofun_st *cfun,
+				 IacaValue **valtab);
+
+/* the number of arguments should correspond to cfun */
+extern void
+iaca_item_pay_load_make_closure_varf (IacaItem *itm,
+				      const struct iacaclofun_st *cfun, ...);
+
+static inline IacaValue *
+iaca_item_pay_load_closure_nth (IacaItem *itm, int rk)
+{
+  struct iacapayloadclosure_st *clo = 0;
+  const struct iacaclofun_st *cfun = 0;
+  unsigned nbv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (itm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || (clo = itm->v_payloadclosure) == NULL
+      || (cfun = clo->clo_fun) == NULL || (nbv = cfun->cfun_nbval) == 0)
+    return NULL;
+  if (rk < 0)
+    rk += (int) nbv;
+  if (rk >= 0 && rk < (int) nbv)
+    return clo->clo_valtab[rk];
+  return NULL;
+}
+
+static inline void
+iaca_item_pay_load_closure_set_nth (IacaItem *itm, int rk, IacaValue *val)
+{
+  struct iacapayloadclosure_st *clo = 0;
+  const struct iacaclofun_st *cfun = 0;
+  unsigned nbv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || (clo = itm->v_payloadclosure) == NULL
+      || (cfun = clo->clo_fun) == NULL || (nbv = cfun->cfun_nbval) == 0)
+    return;
+  if (rk < 0)
+    rk += (int) nbv;
+  if (rk >= 0 && rk < (int) nbv)
+    clo->clo_valtab[rk] = val;
+}
 
 ////////////////////////////////////////////////////////////////
 /* the structure describing the entire state of the IaCa system */

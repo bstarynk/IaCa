@@ -1354,9 +1354,51 @@ iaca_find_clofun (const char *name)
 
 void
 iaca_item_pay_load_make_closure (IacaItem *itm,
-				 const struct iacaclofun_st *cfun)
+				 const struct iacaclofun_st *cfun,
+				 IacaValue **valtab)
 {
-#warning iaca_item_pay_load_make_closure unimplemented
+  unsigned nbv = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM || !cfun)
+    return;
+  nbv = cfun->cfun_nbval;
+  clo = iaca_alloc_data (sizeof (*clo) + nbv * sizeof (IacaValue *));
+  if (itm->v_payloadkind != IACAPAYLOAD_CLOSURE)
+    {
+      iaca_item_pay_load_clear (itm);
+      itm->v_payloadkind = IACAPAYLOAD_CLOSURE;
+    }
+  itm->v_payloadclosure = clo;
+  clo->clo_fun = cfun;
+  if (valtab)
+    {
+      for (unsigned ix = 0; ix < nbv; ix++)
+	clo->clo_valtab[ix] = valtab[ix];
+    }
+}
+
+void
+iaca_item_pay_load_make_closure_varf (IacaItem *itm,
+				      const struct iacaclofun_st *cfun, ...)
+{
+  unsigned nbv = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  va_list args;
+  if (!itm || itm->v_kind != IACAV_ITEM || !cfun)
+    return;
+  nbv = cfun->cfun_nbval;
+  clo = iaca_alloc_data (sizeof (*clo) + nbv * sizeof (IacaValue *));
+  if (itm->v_payloadkind != IACAPAYLOAD_CLOSURE)
+    {
+      iaca_item_pay_load_clear (itm);
+      itm->v_payloadkind = IACAPAYLOAD_CLOSURE;
+    }
+  itm->v_payloadclosure = clo;
+  clo->clo_fun = cfun;
+  va_start (args, cfun);
+  for (unsigned ix = 0; ix < nbv; ix++)
+    clo->clo_valtab[ix] = va_arg (args, IacaValue *);
+  va_end (args);
 }
 
 static GOptionEntry iaca_options[] = {
