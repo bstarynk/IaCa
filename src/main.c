@@ -1401,9 +1401,22 @@ iaca_item_pay_load_make_closure_varf (IacaItem *itm,
   va_end (args);
 }
 
+static GQueue iaca_queue_xtra_modules = G_QUEUE_INIT;
+
+static gboolean
+iaca_xtra_module (const gchar *option_name,
+		  const gchar *value, gpointer data, GError ** error)
+{
+  g_queue_push_tail (&iaca_queue_xtra_modules, (gpointer) value);
+  return TRUE;
+}
+
+
 static GOptionEntry iaca_options[] = {
   {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
    "state directory with data and code", "STATEDIR"},
+  {"xtramodule", 'X', 0, G_OPTION_ARG_CALLBACK, (gpointer) iaca_xtra_module,
+   "extra module to load", "XTRAMODULE"},
   {NULL}
 };
 
@@ -1422,4 +1435,14 @@ main (int argc, char **argv)
   if (!iaca.ia_progmodule)
     iaca_error ("failed to get full program module - %s", g_module_error ());
   iaca_load (iaca.ia_statedir);
+  while (!g_queue_is_empty (&iaca_queue_xtra_modules))
+    {
+      char *modnam = (char *) g_queue_pop_head (&iaca_queue_xtra_modules);
+      if (modnam)
+	{
+	  const char *err = iaca_load_module (iaca.ia_statedir, modnam);
+	  if (err)
+	    iaca_error ("failed to load extra module %s - %s", modnam, err);
+	}
+    };
 }
