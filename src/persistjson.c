@@ -49,10 +49,17 @@ struct iacadumper_st
   unsigned du_magic;		/* always IACA_DUMPER_MAGIC */
   /* the queue of items to be scanned */
   GQueue *du_scanqueue;
-  /* the hash table of already scanned items */
+  /* the hash table of already scanned items, both keys and values are
+     items */
   GHashTable *du_itemhtab;
+  /* the hash table of GTree-s of items keyed by dataspaces */
+  GHashTable *du_dspacehtab;
   /* the currently scanned item */
   IacaItem *du_curitem;
+  /* the currently dumped space */
+  struct iacadataspace_st *du_dspace;
+  /* the currently json array */
+  json_t *du_jsarr;
 };
 
 
@@ -1006,6 +1013,20 @@ iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
   return js;
 }
 
+static gboolean
+iaca_dump_space_traversal (gpointer key, gpointer value, gpointer data)
+{
+  struct iacadumper_st *du = (struct iacadumper_st *) data;
+  IacaItem *itm = (IacaItem *) key;
+  json_t *jsit = 0;
+  g_assert (du && du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (itm && itm->v_kind == IACAV_ITEM && (gpointer) itm == value);
+  g_assert (json_is_array (du->du_jsarr));
+  jsit = iaca_dump_item_content_json (du, itm);
+  json_array_append_new (du->du_jsarr, jsit);
+  return FALSE;			/* to continue the traversal */
+}
+
 void
 iaca_dump (const char *dirpath)
 {
@@ -1026,12 +1047,45 @@ iaca_dump (const char *dirpath)
   dum.du_curitem = NULL;
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
   iaca_dump_scan_loop (&dum);
+  dum.du_dspacehtab = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+					     (GDestroyNotify) NULL,
+					     (GDestroyNotify) g_tree_unref);
+  hkey = hval = NULL;
   for (g_hash_table_iter_init (&hiter, dum.du_itemhtab);
        g_hash_table_iter_next (&hiter, &hkey, &hval);)
     {
       IacaItem *curitm = (IacaItem *) hkey;
+      GTree *curtree = NULL;
       g_assert (hkey == hval);
       g_assert (curitm && curitm->v_kind == IACAV_ITEM);
+      if (!curitm->v_dataspace)
+	continue;
+      curtree = g_hash_table_lookup (dum.du_dspacehtab, curitm->v_dataspace);
+      if (!curtree)
+	{
+	  curtree = g_tree_new ((GCompareFunc) iaca_item_compare);
+	  g_hash_table_insert (dum.du_dspacehtab, curitm->v_dataspace,
+			       curtree);
+	}
+      g_tree_insert (curtree, curitm, curitm);
+    }
+  hkey = hval = NULL;
+  for (g_hash_table_iter_init (&hiter, dum.du_dspacehtab);
+       g_hash_table_iter_next (&hiter, &hkey, &hval);)
+    {
+      struct iacadataspace_st *dspace = hkey;
+      GTree *curtree = hval;
+      json_t *js = 0;
+      json_t *jsarr = 0;
+      g_assert (dspace && dspace->dsp_magic == IACA_SPACE_MAGIC);
+      jsarr = json_array ();
+      js = json_object ();
+      dum.du_dspace = dspace;
+      dum.du_jsarr = jsarr;
+      g_tree_foreach (curtree, iaca_dump_space_traversal, &dum);
+      json_object_set (js, "itemcont", jsarr);
+      dum.du_dspace = NULL;
+      dum.du_jsarr = NULL;
     }
   /* should write the data files, and call the hook to write the code files */
 #warning incomplete iaca_dump

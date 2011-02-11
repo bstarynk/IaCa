@@ -456,6 +456,22 @@ struct iacapayloadclosure_st
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
 #define iacav_item_make(Sp) ((IacaValue*) iaca_item_make((Sp)))
 
+static inline int
+iaca_item_compare (IacaItem *it1, IacaItem *it2)
+{
+  if (it1 == it2)
+    return 0;
+  if (!it1)
+    return -1;
+  if (!it2)
+    return 1;
+  g_assert (it1->v_ident != it2->v_ident);
+  if (it1->v_ident < it2->v_ident)
+    return -1;
+  else				/*if (it1->v_ident > it2->v_ident) */
+    return -1;
+}
+
 struct iacaentryattr_st
 {
   IacaItem *en_item;		/* an item, or IACA_EMPTY_SLOT */
