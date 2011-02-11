@@ -47,6 +47,7 @@ struct iacaloader_st
 struct iacadumper_st
 {
   unsigned du_magic;		/* always IACA_DUMPER_MAGIC */
+  const char *du_dirname;	/* the directory name */
   /* the queue of items to be scanned */
   GQueue *du_scanqueue;
   /* the hash table of already scanned items, both keys and values are
@@ -1042,6 +1043,7 @@ iaca_dump (const char *dirpath)
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
     };
   dum.du_magic = IACA_DUMPER_MAGIC;
+  dum.du_dirname = dirpath;
   dum.du_scanqueue = g_queue_new ();
   dum.du_itemhtab = g_hash_table_new (g_direct_hash, g_direct_equal);
   dum.du_curitem = NULL;
@@ -1077,13 +1079,37 @@ iaca_dump (const char *dirpath)
       GTree *curtree = hval;
       json_t *js = 0;
       json_t *jsarr = 0;
+      time_t now = 0;
+      char *spacename = 0;
+      char *rawdatapath = 0;
+      char *tmpdatapath = 0;
+      char *jsondatapath = 0;
+      char *bakdatapath = 0;
+      time (&now);
       g_assert (dspace && dspace->dsp_magic == IACA_SPACE_MAGIC);
       jsarr = json_array ();
       js = json_object ();
+      spacename = iaca_string_val (dspace->dsp_name);
       dum.du_dspace = dspace;
       dum.du_jsarr = jsarr;
       g_tree_foreach (curtree, iaca_dump_space_traversal, &dum);
+      json_object_set (js, "iacaversion", json_string (IACA_JSON_VERSION));
+      json_object_set (js, "iacaspace", json_string (spacename));
       json_object_set (js, "itemcont", jsarr);
+      rawdatapath = g_build_filename (dirpath, "data", spacename, NULL);
+      tmpdatapath = g_strdup_printf ("%s-%d-%ld.tmp",
+				     rawdatapath, (int) getpid (),
+				     (long) now);
+      if (json_dump_file (js, tmpdatapath, JSON_INDENT (1) | JSON_SORT_KEYS))
+	iaca_error ("failed to dump temporary data %s", tmpdatapath);
+      jsondatapath = g_strdup_printf ("%s.json", rawdatapath);
+      bakdatapath = g_strdup_printf ("%s.json~", rawdatapath);
+      g_rename (jsondatapath, bakdatapath);
+      g_rename (tmpdatapath, jsondatapath);
+#warning should add the json file to the Caia_Manifest file
+      g_free (jsondatapath), jsondatapath = 0;
+      g_free (bakdatapath), bakdatapath = 0;
+      g_free (tmpdatapath), tmpdatapath = 0;
       dum.du_dspace = NULL;
       dum.du_jsarr = NULL;
     }
