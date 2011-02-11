@@ -1010,6 +1010,8 @@ void
 iaca_dump (const char *dirpath)
 {
   struct iacadumper_st dum;
+  GHashTableIter hiter = { };
+  gpointer hkey = 0, hval = 0;
   memset (&dum, 0, sizeof (dum));
   if (!dirpath || !dirpath[0])
     dirpath = iaca.ia_statedir;
@@ -1024,6 +1026,13 @@ iaca_dump (const char *dirpath)
   dum.du_curitem = NULL;
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
   iaca_dump_scan_loop (&dum);
+  for (g_hash_table_iter_init (&hiter, dum.du_itemhtab);
+       g_hash_table_iter_next (&hiter, &hkey, &hval);)
+    {
+      IacaItem *curitm = (IacaItem *) hkey;
+      g_assert (hkey == hval);
+      g_assert (curitm && curitm->v_kind == IACAV_ITEM);
+    }
   /* should write the data files, and call the hook to write the code files */
 #warning incomplete iaca_dump
 }
