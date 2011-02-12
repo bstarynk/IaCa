@@ -1034,6 +1034,11 @@ iaca_dump (const char *dirpath)
   struct iacadumper_st dum;
   GHashTableIter hiter = { };
   gpointer hkey = 0, hval = 0;
+  char *manifestpath = 0;
+  char *tmpmanifestpath = 0;
+  FILE *manifestfile = 0;
+  time_t now = 0;
+  time (&now);
   memset (&dum, 0, sizeof (dum));
   if (!dirpath || !dirpath[0])
     dirpath = iaca.ia_statedir;
@@ -1042,6 +1047,14 @@ iaca_dump (const char *dirpath)
       if (g_mkdir_with_parents (dirpath, 0600))
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
     };
+  manifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
+  tmpmanifestpath =
+    g_strdup_printf ("%s-%ld-%d.tmp", manifestpath, (long) now,
+		     (int) getpid ());
+  manifestfile = fopen (tmpmanifestpath, "w");
+  if (!manifestfile)
+    iaca_error ("failed to open manifest %s - %m", tmpmanifestpath);
+  fprintf (manifestfile, "# file %s\n", manifestpath);
   dum.du_magic = IACA_DUMPER_MAGIC;
   dum.du_dirname = dirpath;
   dum.du_scanqueue = g_queue_new ();
@@ -1079,8 +1092,7 @@ iaca_dump (const char *dirpath)
       GTree *curtree = hval;
       json_t *js = 0;
       json_t *jsarr = 0;
-      time_t now = 0;
-      char *spacename = 0;
+      const char *spacename = 0;
       char *rawdatapath = 0;
       char *tmpdatapath = 0;
       char *jsondatapath = 0;
@@ -1089,7 +1101,7 @@ iaca_dump (const char *dirpath)
       g_assert (dspace && dspace->dsp_magic == IACA_SPACE_MAGIC);
       jsarr = json_array ();
       js = json_object ();
-      spacename = iaca_string_val (dspace->dsp_name);
+      spacename = iaca_string_val ((IacaValue *) (dspace->dsp_name));
       dum.du_dspace = dspace;
       dum.du_jsarr = jsarr;
       g_tree_foreach (curtree, iaca_dump_space_traversal, &dum);
@@ -1106,7 +1118,7 @@ iaca_dump (const char *dirpath)
       bakdatapath = g_strdup_printf ("%s.json~", rawdatapath);
       g_rename (jsondatapath, bakdatapath);
       g_rename (tmpdatapath, jsondatapath);
-#warning should add the json file to the Caia_Manifest file
+      fprintf (manifestfile, "IACADATA %s\n", rawdatapath);
       g_free (jsondatapath), jsondatapath = 0;
       g_free (bakdatapath), bakdatapath = 0;
       g_free (tmpdatapath), tmpdatapath = 0;

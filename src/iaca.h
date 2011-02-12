@@ -45,6 +45,7 @@
 
 // include Glib printf utilities
 #include <glib/gprintf.h>
+#include <glib/gstdio.h>
 
 // include Glib module facilities
 #include <gmodule.h>
