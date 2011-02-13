@@ -37,5 +37,7 @@ $(OBJECTFILES): src/iaca.h
 clean:
 	$(RM) src/*.o src/*.so src/*~ iaca *~
 
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -DIACA_MODULE=\"$(basename $(notdir $<))\" -c $< -o $@
 indent:
 	for f in src/*.h src/*.c; do $(INDENT) $$f; done

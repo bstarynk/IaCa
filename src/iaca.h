@@ -429,21 +429,56 @@ struct iacapayloadqueue_st
 };
 
 
+#define IACA_CLOFUN_MAGIC 0x5285cd1f	/*1384500511 */
+
+/* closure function signatures defines the argument and result types
+   of a function, hence the code context in which it is called. The
+   name after the IACACFSIG_ prefix is in lower case to match the
+   union member inside iacaclofun_st */
+enum iacaclofunsig_en
+{
+  IACACFSIG__NONE,		/* never used */
+  /* activation signal of a GtkWidget like a button, a menu item ... */
+  IACACFSIG_gtkwidget_activate,
+};
+
 /* closure function structures are always const and statically
    allocated, that is in text segment. A clofun whose cfun_name is FOO
    is named iacacfun_FOO */
 struct iacaclofun_st
 {
-  /* the signature is a short string uniquely defining the signature,
-     that is the argument and result types, of the function */
-  const char *cfun_sig;
+  const unsigned cfun_magic;	/* always IACA_CLOFUN_MAGIC */
+  /* The number of closed value in the containing closure: */
   const unsigned cfun_nbval;
+  const char *cfun_sig;
+  /* The module name is the basename of the C file containing the code:  */
+  const char *cfun_module;
+  /* The pointer is a function pointer: */
   union
   {
+    /* when IACACFSIG__NONE, not really used: */
     void *cfun_ptr;
+
+    /* when IACACFSIG_gtkwidget_activate; activation signal of a
+       GtkWidget; the widget is a button, a menu item, ... and the
+       item contains the closure; the resulting function is valid as a
+       gtk signal for the "activate" signal of the button, menu item,
+       ... */
+    void (*cfun_gtkwidget_activate) (GtkWidget *, IacaItem *);
   };
+  /* The name is FOO when the entire iacaclofun_st structure is
+     iacafun_FOO: */
   const char cfun_name[];
 };
+
+#define IACA_DEFINE_CLOFUN(Name,Nbval,Sig,Fun)		\
+  const struct iacaclofun_st iacacfun_##Name = {	\
+    .cfun_magic = IACA_CLOFUN_MAGIC,			\
+    .cfun_nbval = NbVal,				\
+    .cfun_sig = IACACFSIG_##Sig,			\
+    .cfun_module = IACA_MODULE,				\
+    .cfun_##Sig = Fun,					\
+}
 
 extern const struct iacaclofun_st *iaca_find_clofun (const char *name);
 
@@ -560,7 +595,8 @@ extern void iaca_item_pay_load_append_buffer (IacaItem *itm, const char *str);
 extern void
 iaca_item_pay_load_append_cencoded_buffer (IacaItem *itm, const char *str);
 
-extern void iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
+extern void iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt,
+					  ...)
   __attribute__ ((format (printf, 2, 3)));
 
 static inline unsigned iaca_item_pay_load_buffer_length (IacaItem *itm);

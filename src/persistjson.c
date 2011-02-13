@@ -55,12 +55,16 @@ struct iacadumper_st
   GHashTable *du_itemhtab;
   /* the hash table of GTree-s of items keyed by dataspaces */
   GHashTable *du_dspacehtab;
+  /* the GTree of modules, both key and values are module name strings */
+  GTree *du_moduletree;
   /* the currently scanned item */
   IacaItem *du_curitem;
   /* the currently dumped space */
   struct iacadataspace_st *du_dspace;
   /* the currently json array */
   json_t *du_jsarr;
+  /* the manifest file */
+  FILE *du_manifile;
 };
 
 
@@ -338,6 +342,7 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	      (ld,
 	       "not found function %s for closure payload of #%lld",
 	       funam, (long long) itm->v_ident);
+	  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
 	  iaca_item_pay_load_make_closure (itm, cfun, NULL);
 	  for (int ix = 0; ix < ln; ix++)
 	    iaca_item_pay_load_closure_set_nth
@@ -956,6 +961,12 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 	  {
 	    unsigned len = cfun->cfun_nbval;
 	    json_t *jsarr = json_array ();
+	    g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+	    g_assert (cfun->cfun_module != NULL);
+	    if (!g_tree_lookup (du->du_moduletree, cfun->cfun_module))
+	      g_tree_insert (du->du_moduletree,
+			     (gpointer) cfun->cfun_module,
+			     (gpointer) cfun->cfun_module);
 	    js = json_object ();
 	    json_object_set (js, "payloadkind", json_string ("closure"));
 	    json_object_set (js, "payloadclofun",
@@ -1028,6 +1039,18 @@ iaca_dump_space_traversal (gpointer key, gpointer value, gpointer data)
   return FALSE;			/* to continue the traversal */
 }
 
+static gboolean
+iaca_dump_module_traversal (gpointer key, gpointer value, gpointer data)
+{
+  struct iacadumper_st *du = (struct iacadumper_st *) data;
+  const char *modname = (const char *) key;
+  g_assert (du && du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (value == (gpointer) modname);
+  fprintf (du->du_manifile, "IACAMODULE %s\n", modname);
+  fflush (du->du_manifile);
+  return FALSE;			/* to continue the traversal */
+}
+
 void
 iaca_dump (const char *dirpath)
 {
@@ -1036,7 +1059,7 @@ iaca_dump (const char *dirpath)
   gpointer hkey = 0, hval = 0;
   char *manifestpath = 0;
   char *tmpmanifestpath = 0;
-  FILE *manifestfile = 0;
+  char *bakmanifestpath = 0;
   time_t now = 0;
   time (&now);
   memset (&dum, 0, sizeof (dum));
@@ -1048,19 +1071,23 @@ iaca_dump (const char *dirpath)
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
     };
   manifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
+  bakmanifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE "~", NULL);
   tmpmanifestpath =
     g_strdup_printf ("%s-%ld-%d.tmp", manifestpath, (long) now,
 		     (int) getpid ());
-  manifestfile = fopen (tmpmanifestpath, "w");
-  if (!manifestfile)
+  dum.du_manifile = fopen (tmpmanifestpath, "w");
+  if (!dum.du_manifile)
     iaca_error ("failed to open manifest %s - %m", tmpmanifestpath);
-  fprintf (manifestfile, "# file %s\n", manifestpath);
+  fprintf (dum.du_manifile, "# file %s\n", manifestpath);
   dum.du_magic = IACA_DUMPER_MAGIC;
   dum.du_dirname = dirpath;
   dum.du_scanqueue = g_queue_new ();
   dum.du_itemhtab = g_hash_table_new (g_direct_hash, g_direct_equal);
   dum.du_curitem = NULL;
+  /* queue every top level item, or scan every top level value */
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
+  /* initialize the module tree */
+  dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
   iaca_dump_scan_loop (&dum);
   dum.du_dspacehtab = g_hash_table_new_full (g_direct_hash, g_direct_equal,
 					     (GDestroyNotify) NULL,
@@ -1118,13 +1145,26 @@ iaca_dump (const char *dirpath)
       bakdatapath = g_strdup_printf ("%s.json~", rawdatapath);
       g_rename (jsondatapath, bakdatapath);
       g_rename (tmpdatapath, jsondatapath);
-      fprintf (manifestfile, "IACADATA %s\n", rawdatapath);
+      fprintf (dum.du_manifile, "IACADATA %s\n", rawdatapath);
+      fflush (dum.du_manifile);
       g_free (jsondatapath), jsondatapath = 0;
       g_free (bakdatapath), bakdatapath = 0;
       g_free (tmpdatapath), tmpdatapath = 0;
       dum.du_dspace = NULL;
       dum.du_jsarr = NULL;
     }
-  /* should write the data files, and call the hook to write the code files */
-#warning incomplete iaca_dump
+  g_tree_foreach (dum.du_moduletree, iaca_dump_module_traversal, &dum);
+  fclose (dum.du_manifile);
+  dum.du_manifile = NULL;
+  (void) g_rename (manifestpath, bakmanifestpath);
+  g_rename (tmpmanifestpath, manifestpath);
+  /* cleanup the dumper */
+  if (dum.du_scanqueue)
+    g_queue_free (dum.du_scanqueue), dum.du_scanqueue = 0;
+  if (dum.du_itemhtab)
+    g_hash_table_destroy (dum.du_itemhtab), dum.du_itemhtab = 0;
+  if (dum.du_dspacehtab)
+    g_hash_table_destroy (dum.du_dspacehtab), dum.du_dspacehtab = 0;
+  if (dum.du_moduletree)
+    g_tree_destroy (dum.du_moduletree), dum.du_moduletree = 0;
 }
