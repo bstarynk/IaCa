@@ -25,9 +25,12 @@ PREPROFLAGS= -D_GNU_SOURCE -I src -I /usr/local/include \
 LIBES= -L /usr/local/lib -ljansson $(shell pkg-config --libs $(PACKAGES))  -lgc -lrt -lm
 SOURCEFILES=$(wildcard src/*.c)
 OBJECTFILES=$(patsubst %.c,%.o,$(SOURCEFILES))
-.PHONY: all clean indent
+MODULESRCFILES=$(wildcard module/*.c)
+MODULES=$(patsubst module/%.c, module/lib%.so,$(MODULESRCFILES))
+.PHONY: all clean modules indent
 
-all: iaca
+all: iaca modules
+	sync
 
 iaca: $(OBJECTFILES)
 	$(CC) -rdynamic $(CFLAGS) $^ -o $@ $(LIBES)
@@ -35,9 +38,15 @@ iaca: $(OBJECTFILES)
 $(OBJECTFILES): src/iaca.h
 
 clean:
-	$(RM) src/*.o src/*.so src/*~ iaca *~
+	$(RM) src/*.o src/*.so src/*~ iaca *~ module/*~ module/*.so
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -DIACA_MODULE=\"$(basename $(notdir $<))\" -c $< -o $@
+
+module/lib%.so: module/%.c iaca
+	$(CC)  -shared -fPIC $(CFLAGS) -DIACA_MODULE=\"$(basename $(notdir $<))\"  $< -o $@
+
+modules: $(MODULES)
+
 indent:
-	for f in src/*.h src/*.c; do $(INDENT) $$f; done
+	for f in src/*.h src/*.c module/*.c; do $(INDENT) $$f; done

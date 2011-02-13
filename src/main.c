@@ -1409,7 +1409,11 @@ static gboolean
 iaca_xtra_module (const gchar *option_name,
 		  const gchar *value, gpointer data, GError ** error)
 {
-  g_queue_push_tail (&iaca_queue_xtra_modules, (gpointer) value);
+  /* should duplicate the value, since it is freed by Glib */
+  char *dupval = GC_STRDUP (value);
+  iaca_debug ("xtramodule option_name %s value %s @ %p dup @%p", option_name,
+	      value, value, dupval);
+  g_queue_push_tail (&iaca_queue_xtra_modules, (gpointer) dupval);
   return TRUE;
 }
 
@@ -1449,9 +1453,38 @@ main (int argc, char **argv)
       char *modnam = (char *) g_queue_pop_head (&iaca_queue_xtra_modules);
       if (modnam)
 	{
-	  const char *err = iaca_load_module (iaca.ia_statedir, modnam);
+	  const char *err = 0;
+	  iaca_debug ("extra module %s @ %p", modnam, modnam);
+	  err = iaca_load_module (iaca.ia_statedir, modnam);
 	  if (err)
 	    iaca_error ("failed to load extra module %s - %s", modnam, err);
 	}
     };
+  // initialize the modules
+  for (int initix = 1; initix <= 9; initix++)
+    {
+      GHashTableIter hiter = { };
+      gpointer hkey = 0, hval = 0;
+      iaca_debug ("initix %d", initix);
+      for (g_hash_table_iter_init (&hiter, iaca.ia_module_htab);
+	   g_hash_table_iter_next (&hiter, &hkey, &hval);)
+	{
+	  char *inifun = 0;
+	  void (*initfunptr) (void) = 0;
+	  const char *modnam = hkey;
+	  GModule *modul = hval;
+	  inifun = g_strdup_printf ("iacamod_%s_init%d", modnam, initix);
+	  iaca_debug ("modnam %s modul %p inifun %s", modnam, modul, inifun);
+	  if (g_module_symbol (modul, inifun, (void **) &initfunptr)
+	      && initfunptr != 0)
+	    {
+	      iaca_debug ("found %s in %s at %p", inifun,
+			  g_module_name (modul), (void *) initfunptr);
+	      initfunptr ();
+	      iaca_debug ("done %s", inifun);
+	      initfunptr = 0;
+	    };
+	  g_free (inifun), inifun = 0;
+	}
+    }
 }
