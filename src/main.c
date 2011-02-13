@@ -1303,6 +1303,8 @@ iaca_dataspace (const char *name)
   struct iacadataspace_st *dsp = 0;
   if (!name || !name[0])
     return NULL;
+  if (!strcmp (name, "*"))
+    return iaca.ia_transientdataspace;
   for (const char *pc = name; *pc; pc++)
     if (!g_ascii_isalnum (*pc) && *pc != '_')
       return NULL;
@@ -1435,6 +1437,13 @@ main (int argc, char **argv)
   if (!iaca.ia_progmodule)
     iaca_error ("failed to get full program module - %s", g_module_error ());
   iaca_load (iaca.ia_statedir);
+  iaca.ia_transientdataspace = g_malloc0 (sizeof (struct iacadataspace_st));
+  iaca.ia_transientdataspace->dsp_name = iaca_string_make ("*");
+  iaca.ia_transientdataspace->dsp_magic = IACA_SPACE_MAGIC;
+  g_hash_table_insert
+    (iaca.ia_dataspace_htab,
+     (gpointer) iaca_string_val ((IacaValue *) iaca.ia_transientdataspace->
+				 dsp_name), iaca.ia_transientdataspace);
   while (!g_queue_is_empty (&iaca_queue_xtra_modules))
     {
       char *modnam = (char *) g_queue_pop_head (&iaca_queue_xtra_modules);

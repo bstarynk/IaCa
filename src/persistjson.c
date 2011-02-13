@@ -540,20 +540,28 @@ void
 iaca_load (const char *dirpath)
 {
   gchar *manipath = 0;
-  struct iacaloader_st ld = { 0 };
+  struct iacaloader_st loa = { 0 };
   char *line = 0;
   size_t siz = 0;
   FILE *fil = 0;
   long long topdictnum = 0;
+  GQueue *dataque = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
   manipath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
-  memset (&ld, 0, sizeof (ld));
-  ld.ld_magic = IACA_LOADER_MAGIC;
-  ld.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
+  memset (&loa, 0, sizeof (loa));
+  loa.ld_magic = IACA_LOADER_MAGIC;
+  if (setjmp (loa.ld_errjmp) > 0)
+    {
+      iaca_error ("load failed, from file %s line %d - %s",
+		  basename (__FILE__), loa.ld_errline, loa.ld_errstr);
+      return;
+    }
+  loa.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
   fil = fopen (manipath, "r");
   if (!fil)
     iaca_error ("failed to open manifest file %s - %m", manipath);
+  dataque = g_queue_new ();
   siz = 80;
   line = calloc (siz, 1);
   if (!iaca.ia_module_htab)
@@ -577,21 +585,37 @@ iaca_load (const char *dirpath)
 	}
       else if (sscanf (line, " IACADATA %ms", &name))
 	{
-	  char *datapath = 0;
 	  iaca_debug ("data '%s'", name);
-	  datapath = g_build_filename (dirpath,
-				       g_strconcat (name, ".json", NULL),
-				       NULL);
-	  iaca_debug ("datapath '%s'", datapath);
-	  if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
-	    iaca_error ("data file %s does not exist", datapath);
-	  iaca_load_data (&ld, datapath, name);
+	  g_queue_push_tail (dataque, name);
 	}
       else if (sscanf (line, " IACATOPDICT %lld", &topdictnum))
 	{
-#warning should set the toplevel dictionary
+	  if (topdictnum <= 0)
+	    iaca_error ("invalid negative topdictnum %lld", topdictnum);
 	}
     }
+  fclose (fil);
+  fil = 0;
+  while (!g_queue_is_empty (dataque))
+    {
+      char *name = 0;
+      char *datapath = 0;
+      name = g_queue_pop_head (dataque);
+      if (!name)
+	continue;
+      datapath = g_build_filename (dirpath,
+				   g_strconcat (name, ".json", NULL), NULL);
+      iaca_debug ("datapath '%s'", datapath);
+      if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
+	iaca_error ("data file %s does not exist", datapath);
+      iaca_load_data (&loa, datapath, name);
+    }
+  g_queue_free (dataque), dataque = 0;
+  if (topdictnum > 0)
+    iaca.ia_topdictitm = iaca_retrieve_loaded_item (&loa, topdictnum);
+  if (loa.ld_itemhtab)
+    g_hash_table_destroy (loa.ld_itemhtab), loa.ld_itemhtab = 0;
+  g_assert (loa.ld_root == 0);
 }
 
 
@@ -636,6 +660,8 @@ iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem *itm)
   g_assert (du->du_magic == IACA_DUMPER_MAGIC);
   g_assert (itm->v_kind == IACAV_ITEM);
   g_assert (du->du_itemhtab);
+  if (itm->v_dataspace == iaca.ia_transientdataspace)
+    return true;
   if (g_hash_table_lookup (du->du_itemhtab, itm))
     return false;
   return true;

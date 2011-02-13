@@ -738,6 +738,8 @@ extern struct iaca_st
   char *ia_statedir;
   /* the toplevel dictionnary */
   IacaItem *ia_topdictitm;
+  /* the transient data space */
+  struct iacadataspace_st *ia_transientdataspace;
 } iaca;
 /*****************************************************************************
  *****************************************************************************
