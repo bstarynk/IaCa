@@ -18,8 +18,8 @@
 PACKAGES=gtk+-3.0 gmodule-2.0
 CC=gcc
 INDENT=indent
-CFLAGS= $(OPTIMFLAGS) $(PREPROFLAGS)
-OPTIMFLAGS= -Wall -O -g -std=gnu99
+CFLAGS= -std=gnu99 $(OPTIMFLAGS) $(PREPROFLAGS)
+OPTIMFLAGS= -Wall -g -O #-fno-inline
 PREPROFLAGS= -D_GNU_SOURCE -I src -I /usr/local/include \
 	$(shell pkg-config --cflags $(PACKAGES))
 LIBES= -L /usr/local/lib -ljansson $(shell pkg-config --libs $(PACKAGES))  -lgc -lrt -lm

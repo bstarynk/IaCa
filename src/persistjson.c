@@ -370,11 +370,12 @@ iaca_load_item_content (struct iacaloader_st *ld, json_t *js)
     iaca_json_error_printf (ld, "invalid id %lld for loaded item content",
 			    id);
   itm = iaca_retrieve_loaded_item (ld, id);
-  if (itm->v_dataspace)
+  if (itm->v_dataspace && itm->v_dataspace != ld->ld_dataspace)
     iaca_json_error_printf
-      (ld, "loaded item #%lld has dataspace %s",
+      (ld, "loaded item #%lld has dataspace %s but expecting %s",
        id,
-       iaca_string_val_def ((IacaValue *) itm->v_dataspace->dsp_name, "??"));
+       iaca_string_val_def ((IacaValue *) itm->v_dataspace->dsp_name, "??"),
+       iaca_string_val_def ((IacaValue *) ld->ld_dataspace->dsp_name, "??"));
   itm->v_dataspace = ld->ld_dataspace;
   jsattrs = json_object_get (js, "itemattrs");
   if (!json_is_array (jsattrs))
@@ -603,7 +604,7 @@ iaca_load (const char *dirpath)
       name = g_queue_pop_head (dataque);
       if (!name)
 	continue;
-      datapath = g_build_filename (dirpath,
+      datapath = g_build_filename (dirpath, "data",
 				   g_strconcat (name, ".json", NULL), NULL);
       iaca_debug ("datapath '%s'", datapath);
       if (!g_file_test (datapath, G_FILE_TEST_EXISTS))
@@ -1086,6 +1087,7 @@ iaca_dump (const char *dirpath)
   char *manifestpath = 0;
   char *tmpmanifestpath = 0;
   char *bakmanifestpath = 0;
+  char *datadirpath = 0;
   time_t now = 0;
   time (&now);
   memset (&dum, 0, sizeof (dum));
@@ -1096,6 +1098,14 @@ iaca_dump (const char *dirpath)
       if (g_mkdir_with_parents (dirpath, 0700))
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
     };
+  datadirpath = g_build_filename (dirpath, "data", NULL);
+  if (!g_file_test (datadirpath, G_FILE_TEST_IS_DIR))
+    {
+      if (g_mkdir_with_parents (datadirpath, 0700))
+	iaca_error ("failed to create dump data directory %s - %m",
+		    datadirpath);
+    };
+  g_free (datadirpath), datadirpath = 0;
   manifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);
   bakmanifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE "~", NULL);
   tmpmanifestpath =
@@ -1115,6 +1125,7 @@ iaca_dump (const char *dirpath)
   /* initialize the module tree */
   dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
   iaca_dump_scan_loop (&dum);
+
   dum.du_dspacehtab = g_hash_table_new_full (g_direct_hash, g_direct_equal,
 					     (GDestroyNotify) NULL,
 					     (GDestroyNotify) g_tree_unref);
@@ -1171,7 +1182,7 @@ iaca_dump (const char *dirpath)
       bakdatapath = g_strdup_printf ("%s.json~", rawdatapath);
       g_rename (jsondatapath, bakdatapath);
       g_rename (tmpdatapath, jsondatapath);
-      fprintf (dum.du_manifile, "IACADATA %s\n", rawdatapath);
+      fprintf (dum.du_manifile, "IACADATA %s\n", spacename);
       fflush (dum.du_manifile);
       g_free (jsondatapath), jsondatapath = 0;
       g_free (bakdatapath), bakdatapath = 0;
