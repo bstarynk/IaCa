@@ -38,7 +38,7 @@ iaca: $(OBJECTFILES)
 $(OBJECTFILES): src/iaca.h
 
 clean:
-	$(RM) src/*.o src/*.so src/*~ iaca *~ module/*~ module/*.so
+	$(RM) */*.o */*.so */*~ iaca *~ 
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -49,4 +49,4 @@ module/lib%.so: module/%.c iaca
 modules: $(MODULES)
 
 indent:
-	for f in src/*.h src/*.c module/*.c; do $(INDENT) $$f; done
+	for f in */*.h */*.c; do $(INDENT) $$f; done

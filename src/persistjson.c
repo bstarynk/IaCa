@@ -495,10 +495,10 @@ iaca_load_module (const char *dirpath, const char *modname)
       g_free (msg);
       return err;
     }
-  // look for the module in the src/ subdirectory
+  // look for the module in the module/ subdirectory
   if (!module)
-    {				/* always true here */
-      moduledirpath = g_build_filename (dirpath, "src", NULL);
+    {				/* true if module not found */
+      moduledirpath = g_build_filename (dirpath, "module", NULL);
       if (g_file_test (moduledirpath, G_FILE_TEST_IS_DIR))
 	{
 	  modulepath = g_module_build_path (moduledirpath, modname);
@@ -507,10 +507,10 @@ iaca_load_module (const char *dirpath, const char *modname)
       g_free (moduledirpath);
       moduledirpath = 0;
     }
-  // look for the module in the module/ subdirectory
+  // look for the module in the src/ subdirectory
   if (!module)
-    {				/* true if module not found */
-      moduledirpath = g_build_filename (dirpath, "module", NULL);
+    {				/* always true here */
+      moduledirpath = g_build_filename (dirpath, "src", NULL);
       if (g_file_test (moduledirpath, G_FILE_TEST_IS_DIR))
 	{
 	  modulepath = g_module_build_path (moduledirpath, modname);
@@ -546,6 +546,7 @@ iaca_load (const char *dirpath)
   size_t siz = 0;
   FILE *fil = 0;
   long long topdictnum = 0;
+  long long datahooknum = 0;
   GQueue *dataque = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
@@ -594,6 +595,11 @@ iaca_load (const char *dirpath)
 	  if (topdictnum <= 0)
 	    iaca_error ("invalid negative topdictnum %lld", topdictnum);
 	}
+      else if (sscanf (line, " IACASPACEHOOK %lld", &datahooknum))
+	{
+	  if (datahooknum <= 0)
+	    iaca_error ("invalid negative datahooknum %lld", datahooknum);
+	}
     }
   fclose (fil);
   fil = 0;
@@ -614,6 +620,8 @@ iaca_load (const char *dirpath)
   g_queue_free (dataque), dataque = 0;
   if (topdictnum > 0)
     iaca.ia_topdictitm = iaca_retrieve_loaded_item (&loa, topdictnum);
+  if (datahooknum > 0)
+    iaca.ia_dataspacehookitm = iaca_retrieve_loaded_item (&loa, datahooknum);
   if (loa.ld_itemhtab)
     g_hash_table_destroy (loa.ld_itemhtab), loa.ld_itemhtab = 0;
   g_assert (loa.ld_root == 0);
@@ -642,7 +650,12 @@ iaca_dump_queue_item (struct iacadumper_st *du, IacaItem *itm)
       g_assert (fnditm == itm);
       return false;
     }
-  /** we probably should add a hook to add a dataspace if none */
+  /* call the dataspace hook item */
+  if (!itm->v_dataspace && iaca.ia_dataspacehookitm)
+    {
+      iaca_item_pay_load_closure_two_items (du->du_curitem, itm,
+					    iaca.ia_dataspacehookitm);
+    }
   /* ignore item without dataspace */
   if (!itm->v_dataspace)
     return true;
@@ -1122,6 +1135,7 @@ iaca_dump (const char *dirpath)
   dum.du_curitem = NULL;
   /* queue every top level item, or scan every top level value */
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
+  (void) iaca_dump_queue_item (&dum, iaca.ia_dataspacehookitm);
   /* initialize the module tree */
   dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
   iaca_dump_scan_loop (&dum);
@@ -1189,6 +1203,16 @@ iaca_dump (const char *dirpath)
       g_free (tmpdatapath), tmpdatapath = 0;
       dum.du_dspace = NULL;
       dum.du_jsarr = NULL;
+    }
+  if (iaca.ia_topdictitm)
+    {
+      fprintf (dum.du_manifile, "IACATOPDICT %lld\n",
+	       (long long) iaca.ia_topdictitm->v_ident);
+    }
+  if (iaca.ia_dataspacehookitm)
+    {
+      fprintf (dum.du_manifile, "IACASPACEHOOK %lld\n",
+	       (long long) iaca.ia_dataspacehookitm->v_ident);
     }
   g_tree_foreach (dum.du_moduletree, iaca_dump_module_traversal, &dum);
   fclose (dum.du_manifile);

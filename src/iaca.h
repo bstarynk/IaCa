@@ -440,6 +440,8 @@ enum iacaclofunsig_en
   IACACFSIG__NONE,		/* never used */
   /* activation signal of a GtkWidget like a button, a menu item ... */
   IACACFSIG_gtkwidget_activate,
+  /* application to two items */
+  IACACFSIG_two_items,
 };
 
 /* closure function structures are always const and statically
@@ -450,7 +452,8 @@ struct iacaclofun_st
   const unsigned cfun_magic;	/* always IACA_CLOFUN_MAGIC */
   /* The number of closed value in the containing closure: */
   const unsigned cfun_nbval;
-  const char *cfun_sig;
+  /* the signature of the function */
+  enum iacaclofunsig_en cfun_sig;
   /* The module name is the basename of the C file containing the code:  */
   const char *cfun_module;
   /* The pointer is a function pointer: */
@@ -459,12 +462,14 @@ struct iacaclofun_st
     /* when IACACFSIG__NONE, not really used: */
     void *cfun_ptr;
 
-    /* when IACACFSIG_gtkwidget_activate; activation signal of a
+    /* when IACACFSIG_gtkwidget_activate (widget,cloitm); activation signal of a
        GtkWidget; the widget is a button, a menu item, ... and the
        item contains the closure; the resulting function is valid as a
        gtk signal for the "activate" signal of the button, menu item,
        ... */
     void (*cfun_gtkwidget_activate) (GtkWidget *, IacaItem *);
+    /* when IACACFSIG_two_items  (it1, it2, cloitm) */
+    void (*cfun_two_items) (IacaItem *, IacaItem *, IacaItem *);
   };
   /* The name is FOO when the entire iacaclofun_st structure is
      iacafun_FOO: */
@@ -677,6 +682,35 @@ iaca_item_pay_load_make_closure (IacaItem *itm,
 				 const struct iacaclofun_st *cfun,
 				 IacaValue **valtab);
 
+/* can be passed to g_signal_connect */
+extern void
+iaca_item_pay_load_closure_gtkwidget_activate (GtkWidget *wid,
+					       IacaItem *cloitm);
+
+static inline void
+iaca_item_pay_load_closure_two_items (IacaItem *it1, IacaItem *it2,
+				      IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return;
+  /* ensure it1 & it2 are either nil or items */
+  if (it1 && it1->v_kind != IACAV_ITEM)
+    return;
+  if (it2 && it2->v_kind != IACAV_ITEM)
+    return;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return;
+  if (!(cfun = clo->clo_fun))
+    return;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_two_items || !cfun->cfun_two_items)
+    return;
+  cfun->cfun_two_items (it1, it2, cloitm);
+}
+
 /* the number of arguments should correspond to cfun */
 extern void
 iaca_item_pay_load_make_closure_varf (IacaItem *itm,
@@ -736,10 +770,12 @@ extern struct iaca_st
   int64_t ia_item_last_ident;
   /* the state directory */
   char *ia_statedir;
-  /* the toplevel dictionnary */
-  IacaItem *ia_topdictitm;
   /* the transient data space */
   struct iacadataspace_st *ia_transientdataspace;
+  /* the toplevel dictionnary */
+  IacaItem *ia_topdictitm;
+  /* the dataspace hook closure item */
+  IacaItem *ia_dataspacehookitm;
 } iaca;
 /*****************************************************************************
  *****************************************************************************

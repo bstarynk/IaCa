@@ -1404,6 +1404,29 @@ iaca_item_pay_load_make_closure_varf (IacaItem *itm,
   va_end (args);
 }
 
+
+void
+iaca_item_pay_load_closure_gtkwidget_activate (GtkWidget *wid,
+					       IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!wid || !cloitm || cloitm->v_kind != IACAV_ITEM)
+    return;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return;
+  if (!(cfun = clo->clo_fun))
+    return;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_gtkwidget_activate
+      || !cfun->cfun_gtkwidget_activate)
+    return;
+  if (!GTK_IS_WIDGET (wid))
+    return;
+  cfun->cfun_gtkwidget_activate (wid, cloitm);
+}
+
 static GQueue iaca_queue_xtra_modules = G_QUEUE_INIT;
 
 static gboolean
@@ -1418,6 +1441,37 @@ iaca_xtra_module (const gchar *option_name,
   return TRUE;
 }
 
+
+static void
+iaca_initialize_modules (void)
+{
+  // initialize the modules
+  for (int initix = 1; initix <= 9; initix++)
+    {
+      GHashTableIter hiter = { };
+      gpointer hkey = 0, hval = 0;
+      iaca_debug ("initix %d", initix);
+      for (g_hash_table_iter_init (&hiter, iaca.ia_module_htab);
+	   g_hash_table_iter_next (&hiter, &hkey, &hval);)
+	{
+	  char *inifun = 0;
+	  void (*initfunptr) (void) = 0;
+	  const char *modnam = hkey;
+	  GModule *modul = hval;
+	  inifun = g_strdup_printf ("iacamod_%s_init%d", modnam, initix);
+	  if (g_module_symbol (modul, inifun, (void **) &initfunptr)
+	      && initfunptr != 0)
+	    {
+	      iaca_debug ("found %s in %s at %p", inifun,
+			  g_module_name (modul), (void *) initfunptr);
+	      initfunptr ();
+	      iaca_debug ("done %s", inifun);
+	      initfunptr = 0;
+	    };
+	  g_free (inifun), inifun = 0;
+	}
+    }
+}
 
 static GOptionEntry iaca_options[] = {
   {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
@@ -1461,31 +1515,5 @@ main (int argc, char **argv)
 	    iaca_error ("failed to load extra module %s - %s", modnam, err);
 	}
     };
-  // initialize the modules
-  for (int initix = 1; initix <= 9; initix++)
-    {
-      GHashTableIter hiter = { };
-      gpointer hkey = 0, hval = 0;
-      iaca_debug ("initix %d", initix);
-      for (g_hash_table_iter_init (&hiter, iaca.ia_module_htab);
-	   g_hash_table_iter_next (&hiter, &hkey, &hval);)
-	{
-	  char *inifun = 0;
-	  void (*initfunptr) (void) = 0;
-	  const char *modnam = hkey;
-	  GModule *modul = hval;
-	  inifun = g_strdup_printf ("iacamod_%s_init%d", modnam, initix);
-	  iaca_debug ("modnam %s modul %p inifun %s", modnam, modul, inifun);
-	  if (g_module_symbol (modul, inifun, (void **) &initfunptr)
-	      && initfunptr != 0)
-	    {
-	      iaca_debug ("found %s in %s at %p", inifun,
-			  g_module_name (modul), (void *) initfunptr);
-	      initfunptr ();
-	      iaca_debug ("done %s", inifun);
-	      initfunptr = 0;
-	    };
-	  g_free (inifun), inifun = 0;
-	}
-    }
+  iaca_initialize_modules ();
 }
