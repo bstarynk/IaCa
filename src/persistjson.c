@@ -1093,7 +1093,7 @@ iaca_dump (const char *dirpath)
     dirpath = iaca.ia_statedir;
   if (!g_file_test (dirpath, G_FILE_TEST_IS_DIR))
     {
-      if (g_mkdir_with_parents (dirpath, 0600))
+      if (g_mkdir_with_parents (dirpath, 0700))
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
     };
   manifestpath = g_build_filename (dirpath, IACA_MANIFEST_FILE, NULL);

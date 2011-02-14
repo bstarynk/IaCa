@@ -268,9 +268,10 @@ iaca_set_make (IacaValue *parent, IacaValue *elemtab[], unsigned card)
   else
     /* sort the newitems */
     qsort (newitems, nbelems, sizeof (IacaItem *), iaca_itemptr_compare);
-  newset = iaca_unsafe_set_make_merge (parentset->v_elements,
-				       parentset->v_cardinal,
-				       newitems, nbelems);
+  newset =
+    iaca_unsafe_set_make_merge (parentset ? parentset->v_elements : NULL,
+				parentset ? parentset->v_cardinal : 0,
+				newitems, nbelems);
   return newset;
 }
 
@@ -1446,8 +1447,9 @@ main (int argc, char **argv)
   iaca.ia_transientdataspace->dsp_magic = IACA_SPACE_MAGIC;
   g_hash_table_insert
     (iaca.ia_dataspace_htab,
-     (gpointer) iaca_string_val ((IacaValue *) iaca.ia_transientdataspace->
-				 dsp_name), iaca.ia_transientdataspace);
+     (gpointer) iaca_string_val ((IacaValue *) iaca.
+				 ia_transientdataspace->dsp_name),
+     iaca.ia_transientdataspace);
   while (!g_queue_is_empty (&iaca_queue_xtra_modules))
     {
       char *modnam = (char *) g_queue_pop_head (&iaca_queue_xtra_modules);

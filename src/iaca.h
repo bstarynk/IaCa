@@ -209,8 +209,8 @@ extern IacaNode *iaca_node_make (IacaValue *conn, IacaValue *sontab[],
 // variadic allocator of a node with its sons, null terminated
 extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
   __attribute__ ((sentinel));
-#define iaca_node_makevar(Conn,...) \
-  iaca_node_makevarf(Conn,##__VA_ARGS__,(IacaValue*)0)
+#define iacav_node_makevar(Conn,...) \
+  ((IacaValue*)(iaca_node_makevarf(Conn,##__VA_ARGS__,(IacaValue*)0)))
 
 // safe accessors
 // get the connective or a default
@@ -257,10 +257,10 @@ extern IacaSet *iaca_set_make (IacaValue *parentset, IacaValue *elemtab[],
 // variadic allocator of a set with its parent and elements, null terminated
 extern IacaSet *iaca_set_makevarf (IacaValue *parentset, ...)
   __attribute__ ((sentinel));
-#define iaca_set_makevar(Par,...) \
-  iaca_set_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)
-#define iaca_set_makenewvar(...) \
-  iaca_set_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)
+#define iacav_set_makevar(Par,...) \
+  ((IacaValue*)(iaca_set_makevarf(Par,##__VA_ARGS__,(IacaValue*)0)))
+#define iacav_set_makenewvar(...) \
+  ((IacaValue*)(iaca_set_makevarf((IacaValue*)0,##__VA_ARGS__,(IacaValue*)0)))
 
 static inline bool iaca_set_contains (IacaValue *vset, IacaValue *vitem);
 
@@ -1091,7 +1091,7 @@ iaca_item_next_attribute (IacaValue *vitem, IacaValue *vattr)
   ix = iaca_attribute_index_unsafe (tbl, attr);
   if (ix < 0)
     return NULL;
-  for (ix = ix; ix < (int) sz; ix++)
+  for (ix = ix + 1; ix < (int) sz; ix++)
     {
       IacaItem *curit = tbl->at_entab[ix].en_item;
       if (!curit || curit == IACA_EMPTY_SLOT)	/* emptied slot */
