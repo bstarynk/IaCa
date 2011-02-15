@@ -1,0 +1,31 @@
+{
+ "iacaspace": "firstspace",
+ "iacaversion": "2011A",
+ "itemcont": [
+  {
+   "item": 1,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "gtkapplinit",
+    "payloadcloval": [
+     {
+      "id": 3,
+      "kd": "itrv"
+     }
+    ],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 3,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "activateapplication",
+    "payloadcloval": [],
+    "payloadkind": "closure"
+   }
+  }
+ ]
+}
