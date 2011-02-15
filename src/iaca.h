@@ -438,8 +438,9 @@ struct iacapayloadqueue_st
 enum iacaclofunsig_en
 {
   IACACFSIG__NONE,		/* never used */
-  /* activation signal of a GtkWidget like a button, a menu item ... */
-  IACACFSIG_gtkwidget_activate,
+  /* activation or other action signal of a GObject, or even of some
+     GtkWidget like GtkButton... */
+  IACACFSIG_gobject_do,
   /* application to two items */
   IACACFSIG_two_items,
 };
@@ -462,12 +463,12 @@ struct iacaclofun_st
     /* when IACACFSIG__NONE, not really used: */
     void *cfun_ptr;
 
-    /* when IACACFSIG_gtkwidget_activate (widget,cloitm); activation signal of a
-       GtkWidget; the widget is a button, a menu item, ... and the
-       item contains the closure; the resulting function is valid as a
-       gtk signal for the "activate" signal of the button, menu item,
-       ... */
-    void (*cfun_gtkwidget_activate) (GtkWidget *, IacaItem *);
+    /* when IACACFSIG_gobject_do (gobj,cloitm); activation or other
+       action signal of a GObject; the widget is a button, a menu
+       item, ... and the item contains the closure; the resulting
+       function is valid as a gtk signal for the "activate" signal of
+       the button, menu item, ... */
+    void (*cfun_gobject_do) (GObject *, IacaItem *);
     /* when IACACFSIG_two_items  (it1, it2, cloitm) */
     void (*cfun_two_items) (IacaItem *, IacaItem *, IacaItem *);
   };
@@ -684,8 +685,7 @@ iaca_item_pay_load_make_closure (IacaItem *itm,
 
 /* can be passed to g_signal_connect */
 extern void
-iaca_item_pay_load_closure_gtkwidget_activate (GtkWidget *wid,
-					       IacaItem *cloitm);
+iaca_item_pay_load_closure_gobject_do (GObject * gob, IacaItem *cloitm);
 
 static inline void
 iaca_item_pay_load_closure_two_items (IacaItem *it1, IacaItem *it2,
@@ -754,8 +754,12 @@ iaca_item_pay_load_closure_set_nth (IacaItem *itm, int rk, IacaValue *val)
 }
 
 ////////////////////////////////////////////////////////////////
+/* the name of tbe IaCa gtk application; should obey to
+   g_application_id_is_valid rules */
+#define IACA_GTK_APPLICATION_NAME "basile.iaca"
+
 /* the structure describing the entire state of the IaCa system */
-extern struct iaca_st
+extern struct iacastate_st
 {
   /* the topmost module for the whole program */
   GModule *ia_progmodule;
@@ -776,6 +780,10 @@ extern struct iaca_st
   IacaItem *ia_topdictitm;
   /* the dataspace hook closure item */
   IacaItem *ia_dataspacehookitm;
+  /* the GTK initializing closure item */
+  IacaItem *ia_gtkinititm;
+  /* the GTK application, if any */
+  GtkApplication *ia_gtkapplication;
 } iaca;
 /*****************************************************************************
  *****************************************************************************
@@ -1243,6 +1251,8 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
   return NULL;
 }
 
+/* the name of the manifest file, referencing other files in the state
+   directory */
 #define IACA_MANIFEST_FILE "IaCa_Manifest"
 
 #define IACA_SPACE_MAGIC 0x67467f0b	/*1732673291 */

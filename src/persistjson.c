@@ -547,6 +547,7 @@ iaca_load (const char *dirpath)
   FILE *fil = 0;
   long long topdictnum = 0;
   long long datahooknum = 0;
+  long long gtkinitnum = 0;
   GQueue *dataque = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
@@ -577,7 +578,7 @@ iaca_load (const char *dirpath)
       // skip comment or empty line in manifest
       if (line[0] == '#' || line[0] == '\n' || linlen <= 0)
 	continue;
-      if (sscanf (line, " IACAMODULE %ms", &name))
+      if (sscanf (line, " IACAMODULE %ms", &name) > 0)
 	{
 	  const char *errstr = 0;
 	  iaca_debug ("module '%s'", name);
@@ -585,20 +586,25 @@ iaca_load (const char *dirpath)
 	  if (errstr)
 	    iaca_error ("failed to load module '%s' - %s", name, errstr);
 	}
-      else if (sscanf (line, " IACADATA %ms", &name))
+      else if (sscanf (line, " IACADATA %ms", &name) > 0)
 	{
 	  iaca_debug ("data '%s'", name);
 	  g_queue_push_tail (dataque, name);
 	}
-      else if (sscanf (line, " IACATOPDICT %lld", &topdictnum))
+      else if (sscanf (line, " IACATOPDICT %lld", &topdictnum) > 0)
 	{
 	  if (topdictnum <= 0)
 	    iaca_error ("invalid negative topdictnum %lld", topdictnum);
 	}
-      else if (sscanf (line, " IACASPACEHOOK %lld", &datahooknum))
+      else if (sscanf (line, " IACASPACEHOOK %lld", &datahooknum) > 0)
 	{
 	  if (datahooknum <= 0)
 	    iaca_error ("invalid negative datahooknum %lld", datahooknum);
+	}
+      else if (sscanf (line, " IACAGTKINIT %lld", &gtkinitnum) > 0)
+	{
+	  if (gtkinitnum <= 0)
+	    iaca_error ("invalid negative gtkinitnum %lld", gtkinitnum);
 	}
     }
   fclose (fil);
@@ -622,6 +628,8 @@ iaca_load (const char *dirpath)
     iaca.ia_topdictitm = iaca_retrieve_loaded_item (&loa, topdictnum);
   if (datahooknum > 0)
     iaca.ia_dataspacehookitm = iaca_retrieve_loaded_item (&loa, datahooknum);
+  if (gtkinitnum > 0)
+    iaca.ia_gtkinititm = iaca_retrieve_loaded_item (&loa, gtkinitnum);
   if (loa.ld_itemhtab)
     g_hash_table_destroy (loa.ld_itemhtab), loa.ld_itemhtab = 0;
   g_assert (loa.ld_root == 0);
@@ -1136,6 +1144,7 @@ iaca_dump (const char *dirpath)
   /* queue every top level item, or scan every top level value */
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
   (void) iaca_dump_queue_item (&dum, iaca.ia_dataspacehookitm);
+  (void) iaca_dump_queue_item (&dum, iaca.ia_gtkinititm);
   /* initialize the module tree */
   dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
   iaca_dump_scan_loop (&dum);
@@ -1204,15 +1213,21 @@ iaca_dump (const char *dirpath)
       dum.du_dspace = NULL;
       dum.du_jsarr = NULL;
     }
-  if (iaca.ia_topdictitm)
+  if (iaca.ia_topdictitm && iaca.ia_topdictitm->v_kind == IACAV_ITEM)
     {
       fprintf (dum.du_manifile, "IACATOPDICT %lld\n",
 	       (long long) iaca.ia_topdictitm->v_ident);
     }
-  if (iaca.ia_dataspacehookitm)
+  if (iaca.ia_dataspacehookitm
+      && iaca.ia_dataspacehookitm->v_kind == IACAV_ITEM)
     {
       fprintf (dum.du_manifile, "IACASPACEHOOK %lld\n",
 	       (long long) iaca.ia_dataspacehookitm->v_ident);
+    }
+  if (iaca.ia_gtkinititm && iaca.ia_gtkinititm->v_kind == IACAV_ITEM)
+    {
+      fprintf (dum.du_manifile, "IACAGTKINIT %lld\n",
+	       (long long) iaca.ia_gtkinititm->v_ident);
     }
   g_tree_foreach (dum.du_moduletree, iaca_dump_module_traversal, &dum);
   fclose (dum.du_manifile);

@@ -20,7 +20,7 @@
 #include "iaca.h"
 
 
-struct iaca_st iaca;
+struct iacastate_st iaca;
 
 IacaNode *
 iaca_node_make (IacaValue *conn, IacaValue *sontab[], unsigned arity)
@@ -1406,12 +1406,11 @@ iaca_item_pay_load_make_closure_varf (IacaItem *itm,
 
 
 void
-iaca_item_pay_load_closure_gtkwidget_activate (GtkWidget *wid,
-					       IacaItem *cloitm)
+iaca_item_pay_load_closure_gobject_do (GObject * gob, IacaItem *cloitm)
 {
   const struct iacaclofun_st *cfun = 0;
   struct iacapayloadclosure_st *clo = 0;
-  if (!wid || !cloitm || cloitm->v_kind != IACAV_ITEM)
+  if (!gob || !cloitm || cloitm->v_kind != IACAV_ITEM)
     return;
   if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
       || !(clo = cloitm->v_payloadclosure))
@@ -1419,12 +1418,11 @@ iaca_item_pay_load_closure_gtkwidget_activate (GtkWidget *wid,
   if (!(cfun = clo->clo_fun))
     return;
   g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
-  if (cfun->cfun_sig != IACACFSIG_gtkwidget_activate
-      || !cfun->cfun_gtkwidget_activate)
+  if (cfun->cfun_sig != IACACFSIG_gobject_do || !cfun->cfun_gobject_do)
     return;
-  if (!GTK_IS_WIDGET (wid))
+  if (!G_IS_OBJECT (gob))
     return;
-  cfun->cfun_gtkwidget_activate (wid, cloitm);
+  cfun->cfun_gobject_do (gob, cloitm);
 }
 
 static GQueue iaca_queue_xtra_modules = G_QUEUE_INIT;
@@ -1450,7 +1448,6 @@ iaca_initialize_modules (void)
     {
       GHashTableIter hiter = { };
       gpointer hkey = 0, hval = 0;
-      iaca_debug ("initix %d", initix);
       for (g_hash_table_iter_init (&hiter, iaca.ia_module_htab);
 	   g_hash_table_iter_next (&hiter, &hkey, &hval);)
 	{
@@ -1484,6 +1481,7 @@ static GOptionEntry iaca_options[] = {
 int
 main (int argc, char **argv)
 {
+  int exitstatus = 0;
   GError *err = NULL;
   GC_INIT ();
   iaca.ia_statedir = ".";
@@ -1516,4 +1514,38 @@ main (int argc, char **argv)
 	}
     };
   iaca_initialize_modules ();
+  if (iaca.ia_gtkinititm)
+    {
+      if (iaca.ia_gtkinititm->v_kind != IACAV_ITEM
+	  || iaca.ia_gtkinititm->v_payloadkind != IACAPAYLOAD_CLOSURE)
+	iaca_error ("invalid gtk initialize item");
+      g_assert (g_application_id_is_valid (IACA_GTK_APPLICATION_NAME));
+      /* create the application */
+      iaca.ia_gtkapplication = gtk_application_new (IACA_GTK_APPLICATION_NAME,
+						    /* perhaps should use G_APPLICATION_IS_SERVICE */
+						    G_APPLICATION_FLAGS_NONE);
+      iaca_debug ("gtkapplication %p", iaca.ia_gtkapplication);
+      /* initialize it; the initializer will certainly create some
+         window and call gtk_application_add_window */
+      iaca_debug ("gtkapplication %p initializing witb %p #%lld",
+		  iaca.ia_gtkapplication, iaca.ia_gtkinititm,
+		  (long long) iaca.ia_gtkinititm->v_ident);
+      iaca_item_pay_load_closure_gobject_do (G_OBJECT
+					     (iaca.ia_gtkapplication),
+					     iaca.ia_gtkinititm);
+      iaca_debug ("gtkapplication %p initialized witb %p, so running it",
+		  iaca.ia_gtkapplication, iaca.ia_gtkinititm);
+      exitstatus =
+	g_application_run (G_APPLICATION (iaca.ia_gtkapplication), argc,
+			   argv);
+      iaca_debug ("gtkapplication %p exited with %d", iaca.ia_gtkapplication,
+		  exitstatus);
+      g_object_unref (iaca.ia_gtkapplication), iaca.ia_gtkapplication = 0;
+      return exitstatus;
+    }
+  else
+    {				/* no ia_gtkinititm */
+      iaca_error ("missing gtk initializer");
+      return EXIT_FAILURE;
+    }
 }
