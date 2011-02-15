@@ -144,6 +144,10 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t *js)
 {
   IacaValue *res = 0;
   int ty = 0;
+  int prjf = 0;
+  iaca_debug ("js %p ...", js);
+  prjf = json_dumpf (js, stdout, 0);
+  iaca_debug ("jsprinted %s", fflush (stdout) || prjf ? "failed" : "ok");
   if (!ld)
     iaca_error ("null ld");
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
@@ -251,11 +255,15 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t *js)
 static void
 iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 {
+  int prjf = 0;
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   g_assert (itm && itm->v_kind == IACAV_ITEM);
   if (!js)
     iaca_json_error_printf (ld, "no item #%lld payload",
 			    (long long) itm->v_ident);
+  iaca_debug ("js %p ...", js);
+  prjf = json_dumpf (js, stdout, 0);
+  iaca_debug ("jsprinted %s", fflush (stdout) || prjf ? "failed" : "ok");
   if (json_is_null (js))
     {
       itm->v_payloadkind = IACAPAYLOAD__NONE;
@@ -264,8 +272,9 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
     }
   else if (json_is_object (js))
     {
-      const char *kdstr =
-	json_string_value (json_object_get (js, "payloadkind"));
+      json_t *jsplkind = json_object_get (js, "payloadkind");
+      const char *kdstr = json_string_value (jsplkind);
+      iaca_debug ("jsplkind %p kdstr %s", jsplkind, kdstr);
       if (!strcmp (kdstr, "vector"))
 	{
 	  json_t *jsarr = json_object_get (js, "payloadvector");
@@ -332,13 +341,18 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	}
       else if (!strcmp (kdstr, "closure"))
 	{
-	  const char *funam
-	    = json_string_value (json_object_get (js, "payloadclofun"));
+	  json_t *jsclo = json_object_get (js, "payloadclofun");
+	  const char *funam = json_string_value (jsclo);
 	  json_t *jsarr = json_object_get (js, "payloadcloval");
 	  const struct iacaclofun_st *cfun = iaca_find_clofun (funam);
 	  int ln = json_array_size (jsarr);
-	  iaca_debug ("funam '%s' cfun %p ident #%lld",
-		      funam, cfun, (long long) itm->v_ident);
+	  int prjf = 0;
+	  iaca_debug ("jsclo %p ...", jsclo);
+	  prjf = json_dumpf (jsclo, stdout, 0);
+	  iaca_debug ("jsprinted %s", fflush (stdout)
+		      || prjf ? "failed" : "ok");
+	  iaca_debug ("funam '%s' cfun %p ident #%lld", funam, cfun,
+		      (long long) itm->v_ident);
 	  if (!cfun)
 	    iaca_json_error_printf
 	      (ld,
@@ -364,7 +378,11 @@ iaca_load_item_content (struct iacaloader_st *ld, json_t *js)
   IacaItem *itm = 0;
   json_t *jsattrs = 0;
   int nbattrs = 0;
+  int prjf = 0;
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
+  iaca_debug ("js %p ...", js);
+  prjf = json_dumpf (js, stdout, 0);
+  iaca_debug ("jsprinted %s", fflush (stdout) || prjf ? "failed" : "ok");
   if (!json_is_object (js))
     iaca_json_error_printf (ld, "expecting an object for item content");
   id = json_integer_value (json_object_get (js, "item"));
@@ -416,14 +434,20 @@ iaca_load_data (struct iacaloader_st *ld, const char *datapath,
   json_error_t jerr;
   json_t *jsitarr = 0;
   size_t nbit = 0;
+  int prjf = 0;
   memset (&jerr, 0, sizeof (jerr));
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
   ld->ld_dataspace = iaca_dataspace (spacename);
   ld->ld_root = json_load_file (datapath, 0, &jerr);
+  iaca_debug ("ldroot %p jerr .line %d .text %s",
+	      ld->ld_root, jerr.line, jerr.text);
   if (!ld->ld_root)
     iaca_error ("failed to load data file %s: JSON error line %d: %s",
 		datapath, jerr.line, jerr.text);
   iaca_debug ("loaded root %p from data %s", ld->ld_root, datapath);
+  iaca_debug ("root %p ...", ld->ld_root);
+  prjf = json_dumpf (ld->ld_root, stdout, 0);
+  iaca_debug ("jsprinted %s", fflush (stdout) || prjf ? "failed" : "ok");
   if (!json_is_object (ld->ld_root))
     iaca_error ("JSON root in %s not an object", datapath);
   verstr = json_string_value (json_object_get (ld->ld_root, "iacaversion"));
@@ -1217,17 +1241,26 @@ iaca_dump (const char *dirpath)
     }
   if (iaca.ia_topdictitm && iaca.ia_topdictitm->v_kind == IACAV_ITEM)
     {
+      iaca_debug ("topdictitm %p #%lld",
+		  iaca.ia_topdictitm,
+		  (long long) iaca.ia_topdictitm->v_ident);
       fprintf (dum.du_manifile, "IACATOPDICT %lld\n",
 	       (long long) iaca.ia_topdictitm->v_ident);
     }
   if (iaca.ia_dataspacehookitm
       && iaca.ia_dataspacehookitm->v_kind == IACAV_ITEM)
     {
+      iaca_debug ("dataspacehookitm %p #%lld",
+		  iaca.ia_dataspacehookitm,
+		  (long long) iaca.ia_dataspacehookitm->v_ident);
       fprintf (dum.du_manifile, "IACASPACEHOOK %lld\n",
 	       (long long) iaca.ia_dataspacehookitm->v_ident);
     }
   if (iaca.ia_gtkinititm && iaca.ia_gtkinititm->v_kind == IACAV_ITEM)
     {
+      iaca_debug ("gtkinititm %p #%lld",
+		  iaca.ia_gtkinititm,
+		  (long long) iaca.ia_gtkinititm->v_ident);
       fprintf (dum.du_manifile, "IACAGTKINIT %lld\n",
 	       (long long) iaca.ia_gtkinititm->v_ident);
     }

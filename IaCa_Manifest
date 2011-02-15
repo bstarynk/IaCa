@@ -1,2 +1,5 @@
-# cold IaCa_Manifest file
-
+# file ./IaCa_Manifest
+IACADATA firstspace
+IACATOPDICT 1
+IACAGTKINIT 1
+IACAMODULE first
