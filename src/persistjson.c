@@ -574,6 +574,7 @@ iaca_load (const char *dirpath)
   long long topdictnum = 0;
   long long datahooknum = 0;
   long long gtkinitnum = 0;
+  long long moduledumpnum = 0;
   GQueue *dataque = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
@@ -632,6 +633,11 @@ iaca_load (const char *dirpath)
 	  if (gtkinitnum <= 0)
 	    iaca_error ("invalid negative gtkinitnum %lld", gtkinitnum);
 	}
+      else if (sscanf (line, " IACAMODULEDUMP %lld", &moduledumpnum) > 0)
+	{
+	  if (moduledumpnum <= 0)
+	    iaca_error ("invalid negative moduledumpnum %lld", moduledumpnum);
+	}
     }
   fclose (fil);
   fil = 0;
@@ -656,6 +662,8 @@ iaca_load (const char *dirpath)
     iaca.ia_dataspacehookitm = iaca_retrieve_loaded_item (&loa, datahooknum);
   if (gtkinitnum > 0)
     iaca.ia_gtkinititm = iaca_retrieve_loaded_item (&loa, gtkinitnum);
+  if (moduledumpnum > 0)
+    iaca.ia_moduledumpitm = iaca_retrieve_loaded_item (&loa, moduledumpnum);
   if (loa.ld_itemhtab)
     g_hash_table_destroy (loa.ld_itemhtab), loa.ld_itemhtab = 0;
   g_assert (loa.ld_root == 0);
@@ -1118,10 +1126,22 @@ iaca_dump_module_traversal (gpointer key, gpointer value, gpointer data)
 {
   struct iacadumper_st *du = (struct iacadumper_st *) data;
   const char *modname = (const char *) key;
+  IacaValue *vstr = 0;
   g_assert (du && du->du_magic == IACA_DUMPER_MAGIC);
   g_assert (value == (gpointer) modname);
   fprintf (du->du_manifile, "IACAMODULE %s\n", modname);
   fflush (du->du_manifile);
+  if (iaca.ia_moduledumpitm)
+    {
+      vstr = iacav_string_make (modname);
+      iaca_debug ("applying moduledumpitm %p #%lld to modname '%s' @ %p",
+		  iaca.ia_moduledumpitm,
+		  (long long) iaca.ia_moduledumpitm->v_ident, modname, vstr);
+      iaca_item_pay_load_closure_one_value (vstr, iaca.ia_moduledumpitm);
+      iaca_debug ("applied moduledumpitm %p #%lld to modname '%s'",
+		  iaca.ia_moduledumpitm,
+		  (long long) iaca.ia_moduledumpitm->v_ident, modname);
+    }
   return FALSE;			/* to continue the traversal */
 }
 
@@ -1263,6 +1283,14 @@ iaca_dump (const char *dirpath)
 		  (long long) iaca.ia_gtkinititm->v_ident);
       fprintf (dum.du_manifile, "IACAGTKINIT %lld\n",
 	       (long long) iaca.ia_gtkinititm->v_ident);
+    }
+  if (iaca.ia_moduledumpitm && iaca.ia_moduledumpitm->v_kind == IACAV_ITEM)
+    {
+      iaca_debug ("moduledumpitm %p #%lld",
+		  iaca.ia_moduledumpitm,
+		  (long long) iaca.ia_moduledumpitm->v_ident);
+      fprintf (dum.du_manifile, "IACAMODULEDUMP %lld\n",
+	       (long long) iaca.ia_moduledumpitm->v_ident);
     }
   g_tree_foreach (dum.du_moduletree, iaca_dump_module_traversal, &dum);
   fclose (dum.du_manifile);

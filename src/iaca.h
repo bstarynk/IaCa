@@ -447,6 +447,8 @@ enum iacaclofunsig_en
   IACACFSIG_gobject_do,
   /* application to two items */
   IACACFSIG_two_items,
+  /* application to one value */
+  IACACFSIG_one_value,
 };
 
 /* closure function structures are always const and statically
@@ -477,6 +479,9 @@ struct iacaclofun_st
     /* when IACACFSIG_two_items  (it1, it2, cloitm) */
     void (*cfunu_two_items) (IacaItem *, IacaItem *, IacaItem *);
 #define cfun_two_items cfun_un.cfunu_two_items
+    /* when IACACFSIG_one_value (v1, cloitm) */
+    void (*cfunu_one_value) (IacaValue *, IacaItem *);
+#define cfun_one_value cfun_un.cfunu_one_value
   } cfun_un;
   /* The name is FOO when the entire iacaclofun_st structure is
      iacafun_FOO: */
@@ -718,6 +723,24 @@ iaca_item_pay_load_closure_two_items (IacaItem *it1, IacaItem *it2,
   cfun->cfun_two_items (it1, it2, cloitm);
 }
 
+static inline void
+iaca_item_pay_load_closure_one_value (IacaValue *v1, IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return;
+  if (!(cfun = clo->clo_fun))
+    return;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_one_value || !cfun->cfun_one_value)
+    return;
+  cfun->cfun_one_value (v1, cloitm);
+}
+
 /* the number of arguments should correspond to cfun */
 extern void
 iaca_item_pay_load_make_closure_varf (IacaItem *itm,
@@ -789,6 +812,8 @@ extern struct iacastate_st
   IacaItem *ia_dataspacehookitm;
   /* the GTK initializing closure item */
   IacaItem *ia_gtkinititm;
+  /* the module dumping closure item */
+  IacaItem *ia_moduledumpitm;
   /* the GTK application, if any */
   GtkApplication *ia_gtkapplication;
 } iaca;

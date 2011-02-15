@@ -49,4 +49,4 @@ module/lib%.so: module/%.c iaca
 modules: $(MODULES)
 
 indent:
-	for f in */*.h */*.c; do $(INDENT) $$f; done
+	for f in */*.h */*.c; do $(INDENT) $$f; mv $$f~ $$f.bak;  $(INDENT) $$f; mv $$f.bak $$f~;  done
