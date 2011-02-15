@@ -322,6 +322,8 @@ static inline IacaValue *iaca_set_first_element (IacaValue *vset);
 static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 						 IacaValue *velem);
 
+// safe casting to IacaSet
+static inline IacaSet *iacac_set (IacaValue *v);
 /***************** SHARED ITEM VALUES ****************/
 /****
   JSON representation. We serialize separately item shared references
@@ -385,6 +387,8 @@ struct iacaitem_st
     struct iacapayloadclosure_st *v_payloadclosure;	/* when IACAPAYLOAD_CLOSURE */
   };
 };
+// safe casting to IacaItem
+static inline IacaItem *iacac_item (IacaValue *v);
 
 struct iacapayloadvector_st
 {
@@ -468,10 +472,12 @@ struct iacaclofun_st
        item, ... and the item contains the closure; the resulting
        function is valid as a gtk signal for the "activate" signal of
        the button, menu item, ... */
-    void (*cfun_gobject_do) (GObject *, IacaItem *);
+    void (*cfunu_gobject_do) (GObject *, IacaItem *);
+#define cfun_gobject_do cfun_un.cfunu_gobject_do
     /* when IACACFSIG_two_items  (it1, it2, cloitm) */
-    void (*cfun_two_items) (IacaItem *, IacaItem *, IacaItem *);
-  };
+    void (*cfunu_two_items) (IacaItem *, IacaItem *, IacaItem *);
+#define cfun_two_items cfun_un.cfunu_two_items
+  } cfun_un;
   /* The name is FOO when the entire iacaclofun_st structure is
      iacafun_FOO: */
   const char cfun_name[];
@@ -480,10 +486,11 @@ struct iacaclofun_st
 #define IACA_DEFINE_CLOFUN(Name,Nbval,Sig,Fun)		\
   const struct iacaclofun_st iacacfun_##Name = {	\
     .cfun_magic = IACA_CLOFUN_MAGIC,			\
-    .cfun_nbval = NbVal,				\
+    .cfun_nbval = Nbval,				\
     .cfun_sig = IACACFSIG_##Sig,			\
     .cfun_module = IACA_MODULE,				\
     .cfun_##Sig = Fun,					\
+    .cfun_name = #Name					\
 }
 
 extern const struct iacaclofun_st *iaca_find_clofun (const char *name);
@@ -917,6 +924,15 @@ iaca_set_cardinal_def (IacaValue *v, int def)
   return ((IacaSet *) v)->v_cardinal;
 }
 
+// safe casting to IacaSet
+static inline IacaSet *
+iacac_set (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_SET)
+    return NULL;
+  return ((IacaSet *) v);
+}
+
 /* internal UNSAFE routine returning the index of an attribute inside
    a table, or else -1. Don't call it unless you are sure that tbl is
    a non-null table, and itat is an item! */
@@ -992,6 +1008,15 @@ iaca_item_first_attribute (IacaValue *vitem)
       return (IacaValue *) curit;
     }
   return NULL;
+}
+
+// safe casting to IacaItem
+static inline IacaItem *
+iacac_item (IacaValue *v)
+{
+  if (!v || v->v_kind != IACAV_ITEM)
+    return NULL;
+  return ((IacaItem *) v);
 }
 
 static inline enum iacapayloadkind_en

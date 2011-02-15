@@ -1,39 +1,130 @@
 // file module/first.c
 #include "iaca.h"
 
+/// initialize the application
+enum iacagtkinitval_en
+{
+  IACAGTKINITVAL_ACTIVEAPPL,
+  IACAGTKINITVAL__LAST
+};
+
+static void
+iacafirst_gtkinit (GObject * gob, IacaItem *cloitm)
+{
+  GtkApplication *gapp = GTK_APPLICATION (gob);
+  IacaItem *itactivapp = iacac_item (iaca_item_pay_load_closure_nth (cloitm,
+								     IACAGTKINITVAL_ACTIVEAPPL));
+  iaca_debug ("gapp %p itactivapp %p", gapp, itactivapp);
+  g_assert (GTK_IS_APPLICATION (gapp));
+  g_signal_connect ((GObject *) gapp, "activate",
+		    G_CALLBACK (iaca_item_pay_load_closure_gobject_do),
+		    (gpointer) itactivapp);
+}
+
+IACA_DEFINE_CLOFUN (gtkapplinit,
+		    IACAGTKINITVAL__LAST, gobject_do, iacafirst_gtkinit);
+
+/// activate the application
+enum iacaactivateapplicationval_en
+{
+  IACAACTIVATEAPPLICATIONVAL__LAST
+};
+
+static void
+popup_final_dialog (GtkWindow * win, gpointer ptr)
+{
+  GtkWidget *dial = 0;
+  GtkWidget *lab = 0;
+  char *markup = 0;
+  char *realstatedir = 0;
+  guint res = 0;
+  g_assert (ptr == NULL);
+  g_assert (win && GTK_IS_WINDOW (win));
+  dial = gtk_dialog_new_with_buttons ("Finally dump state",
+				      win,
+				      GTK_DIALOG_MODAL |
+				      GTK_DIALOG_DESTROY_WITH_PARENT,
+				      GTK_STOCK_OK, GTK_RESPONSE_ACCEPT,
+				      GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT,
+				      NULL);
+  iaca_debug ("dial %p", dial);
+  lab = gtk_label_new (NULL);
+  realstatedir = realpath (iaca.ia_statedir, NULL);
+  markup =
+    g_markup_printf_escaped ("<i>Ok</i> to save Iaca state in <tt>%s</tt>\n"
+			     "<i>Cancel</i> to quit Iaca without saving",
+			     realstatedir);
+  gtk_label_set_markup (GTK_LABEL (lab), markup);
+  free (realstatedir), realstatedir = 0;
+  g_free (markup), markup = 0;
+  gtk_container_add (GTK_CONTAINER
+		     (gtk_dialog_get_content_area (GTK_DIALOG (dial))), lab);
+  gtk_widget_show_all (dial);
+  res = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("res %u", res);
+  if (res == GTK_RESPONSE_ACCEPT)
+    {
+      iaca_debug ("accept dumping state to %s", iaca.ia_statedir);
+      iaca_dump (iaca.ia_statedir);
+    }
+  else
+    {
+      iaca_debug ("dont dump state but quit");
+    }
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+  gtk_main_quit ();
+}
+
+static void
+iacafirst_activateapplication (GObject * gapp, IacaItem *cloitm)
+{
+  GtkApplication *app = GTK_APPLICATION (gapp);
+  GtkWindow *win = 0;
+  iaca_debug ("app %p", app);
+  g_assert (GTK_IS_APPLICATION (app));
+  win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
+  g_signal_connect (win, "destroy", G_CALLBACK (popup_final_dialog),
+		    (gpointer) 0);
+  gtk_window_set_title (win, "iaca first");
+  gtk_window_set_application (win, app);
+  gtk_widget_show_all (GTK_WIDGET (win));
+}
+
+IACA_DEFINE_CLOFUN (activateapplication,
+		    IACAACTIVATEAPPLICATIONVAL__LAST,
+		    gobject_do, iacafirst_activateapplication);
+
 void
 iacamod_first_init1 (void)
 {
-  IacaItem *ita = 0, *itb = 0, *itc = 0, *itd = 0, *ite = 0, *itdict = 0;
-  IacaValue *v1 = 0, *v2 = 0, *v3 = 0;
+  IacaItem *itdict = 0;
+  IacaItem *itgtkinit = 0;
+  IacaItem *itactivappl = 0;
   struct iacadataspace_st *spf = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first spf=%p", spf);
-  iaca.ia_topdictitm = itdict = iaca_item_make (spf);
-  iaca_item_pay_load_reserve_dictionnary (itdict, 15);
-  ita = iaca_item_make (spf);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "a", (IacaValue *) ita);
-  itb = iaca_item_make (spf);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "b", (IacaValue *) itb);
-  itc = iaca_item_make (spf);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "c", (IacaValue *) itc);
-  itd = iaca_item_make (spf);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "d", (IacaValue *) itd);
-  ite = iaca_item_make (spf);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "e", (IacaValue *) ite);
-  iaca_item_pay_load_put_dictionnary_str (itdict, "thedict",
-					  (IacaValue *) itdict);
-  iaca_debug ("ita %p itb %p itc %p itd %p ite %p", ita, itb, itc, itd, ite);
-  v1 = iacav_string_make ("some\nstring");
-  iaca_item_physical_put ((IacaValue *) ita, (IacaValue *) itb, v1);
-  v3 = iacav_node_makevar ((IacaValue *) itc, ita);
-  v2 = iacav_node_makevar ((IacaValue *) itb, ita, iacav_integer_make (234),
-			   v3);
-  iaca_item_physical_put ((IacaValue *) ita, (IacaValue *) itc, v2);
-  iaca_item_physical_put ((IacaValue *) ita, (IacaValue *) itd,
-			  (IacaValue *) ite);
-  iaca_item_physical_put ((IacaValue *) itc, (IacaValue *) ita,
-			  (IacaValue *) itb);
-  v3 = iacav_set_makenewvar (ita, itb, itd);
-  iaca_item_physical_put ((IacaValue *) itb, (IacaValue *) ite, v3);
-  iaca_dump ("/tmp/firstiaca");
+  if (!(itdict = iaca.ia_topdictitm))
+    {
+      iaca.ia_topdictitm = itdict = iaca_item_make (spf);
+      iaca_item_pay_load_reserve_dictionnary (itdict, 53);
+      iaca_item_pay_load_put_dictionnary_str (itdict, "the_dictionnary",
+					      (IacaValue *) itdict);
+    }
+  if (!(itgtkinit = iaca.ia_gtkinititm))
+    {
+      iaca.ia_gtkinititm = itgtkinit = iaca_item_make (spf);
+      iaca_item_pay_load_make_closure (itgtkinit, &iacacfun_gtkapplinit,
+				       (IacaValue **) 0);
+    }
+  if (!(itactivappl =
+	iacac_item (iaca_item_pay_load_closure_nth
+		    (itgtkinit, IACAGTKINITVAL_ACTIVEAPPL))))
+    {
+      itactivappl = iaca_item_make (spf);
+      iaca_item_pay_load_make_closure (itactivappl,
+				       &iacacfun_activateapplication,
+				       (IacaValue **) 0);
+      iaca_item_pay_load_closure_set_nth (itgtkinit,
+					  IACAGTKINITVAL_ACTIVEAPPL,
+					  (IacaValue *) itactivappl);
+    }
 }
