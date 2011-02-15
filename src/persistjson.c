@@ -337,8 +337,8 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	  json_t *jsarr = json_object_get (js, "payloadcloval");
 	  const struct iacaclofun_st *cfun = iaca_find_clofun (funam);
 	  int ln = json_array_size (jsarr);
-	  iaca_debug("funam '%s' cfun %p ident #%lld", 
-		     funam, cfun, (long long) itm->v_ident);
+	  iaca_debug ("funam '%s' cfun %p ident #%lld",
+		      funam, cfun, (long long) itm->v_ident);
 	  if (!cfun)
 	    iaca_json_error_printf
 	      (ld,
