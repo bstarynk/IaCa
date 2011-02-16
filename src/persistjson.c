@@ -22,6 +22,15 @@
 
 #define IACA_JSON_VERSION "2011A"
 
+/* macro to handle every top item; call the Act macro with the field
+   name and the manifest word */
+#define IACA_PERSIST_EVERY_TOP_ITEM(Act)	\
+  Act(ia_topdictitm, "IACATOPDICT")		\
+  Act(ia_dataspacehookitm, "IACADATAHOOK")	\
+  Act(ia_gtkinititm, "IACAGTKINIT")		\
+  Act(ia_moduledumpitm, "IACAMODULEDUMP")
+
+
 #define IACA_LOADER_MAGIC 0x347b938b	/*880513931 */
 struct iacaloader_st
 {
@@ -68,40 +77,22 @@ struct iacadumper_st
 };
 
 
-/* a Glib GHashTable compatible hash function on items */
-guint
-iaca_item_ghash (gconstpointer p)
-{
-  const IacaItem *itm = (const IacaItem *) p;
-  if (!itm)
-    return 0;
-  return itm->v_ident % 1073741939;	/* a prime number near 1 << 30 */
-}
-
-gboolean
-iaca_item_gheq (gconstpointer p1, gconstpointer p2)
-{
-  const IacaItem *itm1 = (const IacaItem *) p1;
-  const IacaItem *itm2 = (const IacaItem *) p1;
-  if (itm1 == itm2)
-    return TRUE;
-  if (!itm1 || !itm2)
-    return FALSE;
-  return itm1->v_ident == itm2->v_ident;
-}
-
 /* retrieve or create a loaded item of given id */
 static inline IacaItem *
 iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
 {
   IacaItem *itm = 0;
-  struct iacaitem_st itmst = { 0 };
   if (id <= 0 || !ld || !ld->ld_itemhtab)
     return NULL;
-  itmst.v_ident = id;
-  itm = g_hash_table_lookup (ld->ld_itemhtab, &itmst);
+  itm = g_hash_table_lookup (ld->ld_itemhtab, &id);
   if (itm)
-    return itm;
+    {
+      g_assert (itm->v_kind == IACAV_ITEM);
+      iaca_debug ("found id %lld itm %p #%lld", (long long) id,
+		  itm, (long long) iaca_item_ident (itm));
+      g_assert (itm->v_ident == id);
+      return itm;
+    }
   itm = iaca_alloc_data (sizeof (IacaItem));
   itm->v_kind = IACAV_ITEM;
   itm->v_ident = id;
@@ -112,7 +103,8 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   itm->v_payloadkind = IACAPAYLOAD__NONE;
   itm->v_payloadptr = NULL;
   itm->v_itemcontent = NULL;
-  g_hash_table_insert (ld->ld_itemhtab, itm, itm);
+  g_hash_table_insert (ld->ld_itemhtab, &itm->v_ident, itm);
+  iaca_debug ("new id %lld itm %p #%lld", id, itm, iaca_item_ident (itm));
   return itm;
 }
 
@@ -576,10 +568,9 @@ iaca_load (const char *dirpath)
   char *line = 0;
   size_t siz = 0;
   FILE *fil = 0;
-  long long topdictnum = 0;
-  long long datahooknum = 0;
-  long long gtkinitnum = 0;
-  long long moduledumpnum = 0;
+#define DECLARE_PERSIST_NUM(Fld,Str) long long Fld##_num = 0;
+  IACA_PERSIST_EVERY_TOP_ITEM (DECLARE_PERSIST_NUM)
+#undef DECLARE_PERSIST_NUM
   GQueue *dataque = 0;
   if (!dirpath || !dirpath[0])
     dirpath = ".";
@@ -592,7 +583,7 @@ iaca_load (const char *dirpath)
 		  basename (__FILE__), loa.ld_errline, loa.ld_errstr);
       return;
     }
-  loa.ld_itemhtab = g_hash_table_new (iaca_item_ghash, iaca_item_gheq);
+  loa.ld_itemhtab = g_hash_table_new (g_int64_hash, g_int64_equal);
   fil = fopen (manipath, "r");
   if (!fil)
     iaca_error ("failed to open manifest file %s - %m", manipath);
@@ -623,26 +614,17 @@ iaca_load (const char *dirpath)
 	  iaca_debug ("data '%s'", name);
 	  g_queue_push_tail (dataque, name);
 	}
-      else if (sscanf (line, " IACATOPDICT %lld", &topdictnum) > 0)
-	{
-	  if (topdictnum <= 0)
-	    iaca_error ("invalid negative topdictnum %lld", topdictnum);
-	}
-      else if (sscanf (line, " IACASPACEHOOK %lld", &datahooknum) > 0)
-	{
-	  if (datahooknum <= 0)
-	    iaca_error ("invalid negative datahooknum %lld", datahooknum);
-	}
-      else if (sscanf (line, " IACAGTKINIT %lld", &gtkinitnum) > 0)
-	{
-	  if (gtkinitnum <= 0)
-	    iaca_error ("invalid negative gtkinitnum %lld", gtkinitnum);
-	}
-      else if (sscanf (line, " IACAMODULEDUMP %lld", &moduledumpnum) > 0)
-	{
-	  if (moduledumpnum <= 0)
-	    iaca_error ("invalid negative moduledumpnum %lld", moduledumpnum);
-	}
+#define LOAD_SCAN_TOP_ITEM(Fld,Str)				\
+      else if (sscanf (line, " " Str " %lld", &Fld##_num) > 0)	\
+      {								\
+	if (Fld##_num <= 0)					\
+	  iaca_error("invalid " Str " %lld", Fld##_num);	\
+        iaca_debug (#Fld "_num %lld",Fld##_num);       		\
+      }
+      IACA_PERSIST_EVERY_TOP_ITEM (LOAD_SCAN_TOP_ITEM)
+#undef LOAD_SCAN_TOP_ITEM
+	else
+	iaca_warning ("invalid manifest line %s", line);
     }
   fclose (fil);
   fil = 0;
@@ -661,14 +643,15 @@ iaca_load (const char *dirpath)
       iaca_load_data (&loa, datapath, name);
     }
   g_queue_free (dataque), dataque = 0;
-  if (topdictnum > 0)
-    iaca.ia_topdictitm = iaca_retrieve_loaded_item (&loa, topdictnum);
-  if (datahooknum > 0)
-    iaca.ia_dataspacehookitm = iaca_retrieve_loaded_item (&loa, datahooknum);
-  if (gtkinitnum > 0)
-    iaca.ia_gtkinititm = iaca_retrieve_loaded_item (&loa, gtkinitnum);
-  if (moduledumpnum > 0)
-    iaca.ia_moduledumpitm = iaca_retrieve_loaded_item (&loa, moduledumpnum);
+#define SET_LOADED_ITEM(Fld,Str)				\
+  if (Fld##_num > 0) {						\
+    iaca.Fld = iaca_retrieve_loaded_item (&loa, Fld##_num);	\
+    iaca_debug ("set " #Fld " [#%lld] to %p #%lld",	       	\
+		Fld##_num, iaca.Fld,				\
+		(long long) iaca_item_ident (iaca.Fld));	\
+  }
+  IACA_PERSIST_EVERY_TOP_ITEM (SET_LOADED_ITEM);
+#undef SET_LOADED_ITEM
   if (loa.ld_itemhtab)
     g_hash_table_destroy (loa.ld_itemhtab), loa.ld_itemhtab = 0;
   g_assert (loa.ld_root == 0);
@@ -1310,39 +1293,15 @@ iaca_dump (const char *dirpath)
       dum.du_dspace = NULL;
       dum.du_jsarr = NULL;
     }
-  if (iaca.ia_topdictitm && iaca.ia_topdictitm->v_kind == IACAV_ITEM)
-    {
-      iaca_debug ("topdictitm %p #%lld",
-		  iaca.ia_topdictitm,
-		  (long long) iaca.ia_topdictitm->v_ident);
-      fprintf (dum.du_manifile, "IACATOPDICT %lld\n",
-	       (long long) iaca.ia_topdictitm->v_ident);
-    }
-  if (iaca.ia_dataspacehookitm
-      && iaca.ia_dataspacehookitm->v_kind == IACAV_ITEM)
-    {
-      iaca_debug ("dataspacehookitm %p #%lld",
-		  iaca.ia_dataspacehookitm,
-		  (long long) iaca.ia_dataspacehookitm->v_ident);
-      fprintf (dum.du_manifile, "IACASPACEHOOK %lld\n",
-	       (long long) iaca.ia_dataspacehookitm->v_ident);
-    }
-  if (iaca.ia_gtkinititm && iaca.ia_gtkinititm->v_kind == IACAV_ITEM)
-    {
-      iaca_debug ("gtkinititm %p #%lld",
-		  iaca.ia_gtkinititm,
-		  (long long) iaca.ia_gtkinititm->v_ident);
-      fprintf (dum.du_manifile, "IACAGTKINIT %lld\n",
-	       (long long) iaca.ia_gtkinititm->v_ident);
-    }
-  if (iaca.ia_moduledumpitm && iaca.ia_moduledumpitm->v_kind == IACAV_ITEM)
-    {
-      iaca_debug ("moduledumpitm %p #%lld",
-		  iaca.ia_moduledumpitm,
-		  (long long) iaca.ia_moduledumpitm->v_ident);
-      fprintf (dum.du_manifile, "IACAMODULEDUMP %lld\n",
-	       (long long) iaca.ia_moduledumpitm->v_ident);
-    }
+#define MANIFEST_DUMP_TOP_ITEM(Fld,Str)			\
+  if (iaca.Fld && iaca.Fld->v_kind == IACAV_ITEM) {	\
+    iaca_debug (#Fld " %p #%lld", iaca.Fld,		\
+		(long long) iaca.Fld->v_ident);		\
+    fprintf (dum.du_manifile, Str " %lld\n",		\
+	     (long long) iaca.Fld->v_ident);		\
+  };
+  IACA_PERSIST_EVERY_TOP_ITEM (MANIFEST_DUMP_TOP_ITEM);
+#undef MANIFEST_DUMP_TOP_ITEM
   g_tree_foreach (dum.du_moduletree, iaca_dump_module_traversal, &dum);
   fclose (dum.du_manifile);
   dum.du_manifile = NULL;

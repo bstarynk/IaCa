@@ -418,6 +418,8 @@ struct iacaitem_st
 // safe casting to IacaItem
 static inline IacaItem *iacac_item (IacaValue *v);
 
+static inline int64_t iaca_item_ident (IacaItem *it);
+
 struct iacapayloadvector_st
 {
   unsigned vec_siz;		/* allocated size */
@@ -1098,6 +1100,12 @@ iacac_item (IacaValue *v)
   if (!v || v->v_kind != IACAV_ITEM)
     return NULL;
   return ((IacaItem *) v);
+}
+
+static inline int64_t
+iaca_item_ident (IacaItem *it)
+{
+  return (it && it->v_kind == IACAV_ITEM) ? it->v_ident : 0;
 }
 
 static inline enum iacapayloadkind_en

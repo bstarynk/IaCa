@@ -1562,6 +1562,9 @@ main (int argc, char **argv)
 	}
     };
   iaca_initialize_modules ();
+  iaca_debug ("ia_gtkinititm %p #%lld", iaca.ia_gtkinititm,
+	      (long long) (iaca.ia_gtkinititm ? iaca.
+			   ia_gtkinititm->v_ident : 0LL));
   if (iaca.ia_gtkinititm)
     {
       if (iaca.ia_gtkinititm->v_kind != IACAV_ITEM
