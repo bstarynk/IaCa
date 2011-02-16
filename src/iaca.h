@@ -112,6 +112,7 @@ enum iacavaluekind_en
   IACAV_NODE,			/* immutable node value */
   IACAV_SET,			/* immutable dichotomized set of items */
   IACAV_ITEM,			/* [shared mutable] item with payload */
+  IACAV_WIDGET,			/* transient GtkWidget with value */
 };
 
 //// forward declarations
@@ -121,7 +122,7 @@ typedef struct iacastring_st IacaString;	/// boxed string
 typedef struct iacanode_st IacaNode;	/// node
 typedef struct iacaset_st IacaSet;	/// immutable set
 typedef struct iacaitem_st IacaItem;	/// shared mutable item with payload
-
+typedef struct iacawidget_st IacaWidget;	//// transient GtkWidget with value
 /// every value starts with a discriminating kind
 struct iacavalue_st
 {
@@ -324,6 +325,32 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 
 // safe casting to IacaSet
 static inline IacaSet *iacac_set (IacaValue *v);
+
+
+/***************** TRANSIENT BOXED WIDGET VALUES ************/
+
+struct iacawidget_st
+{
+  unsigned v_kind;		/* always IACAV_WIDGET */
+  GtkWidget *v_widget;		/* any Gtk widget - immutable */
+  IacaValue *v_wdata;		/* associated data */
+};
+
+// safe casting to IacaWidget
+static inline IacaWidget *iacac_widget (IacaValue *);
+
+// get the associated widget or NULL
+static inline GtkWidget *iaca_widget (IacaValue *);
+// get the associated wdata or null
+static inline IacaValue *iaca_widget_data (IacaValue *);
+// set the associated wdata
+static inline void iaca_widget_put_data (IacaValue *val, IacaValue *wdata);
+
+// retrieve or make the boxed widget of a gtk widget
+extern IacaWidget *iaca_widget_box (GtkWidget *wid);
+#define iacav_widget_box(Wid) ((IacaValue*)iaca_widget_box(Wid))
+
+
 /***************** SHARED ITEM VALUES ****************/
 /****
   JSON representation. We serialize separately item shared references
@@ -800,6 +827,8 @@ extern struct iacastate_st
   /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
      strings */
   GHashTable *ia_clofun_htab;
+  /* hashtable associating GtkWidget* to their boxed values if any */
+  GHashTable *ia_boxwidget_htab;
   /* last item identifier */
   int64_t ia_item_last_ident;
   /* the state directory */
@@ -1299,6 +1328,40 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 	return (IacaValue *) curitem;
     }
   return NULL;
+}
+
+
+/************* BOXED WIDGET VALUES ***************/
+static inline IacaWidget *
+iacac_widget (IacaValue *val)
+{
+  if (!val || val->v_kind != IACAV_WIDGET)
+    return NULL;
+  return (IacaWidget *) val;
+}
+
+static inline GtkWidget *
+iaca_widget (IacaValue *val)
+{
+  if (!val || val->v_kind != IACAV_WIDGET)
+    return NULL;
+  return ((IacaWidget *) val)->v_widget;
+}
+
+static inline IacaValue *
+iaca_widget_data (IacaValue *val)
+{
+  if (!val || val->v_kind != IACAV_WIDGET)
+    return NULL;
+  return ((IacaWidget *) val)->v_wdata;
+}
+
+static inline void
+iaca_widget_put_data (IacaValue *val, IacaValue *wdata)
+{
+  if (!val || val->v_kind != IACAV_WIDGET)
+    return;
+  ((IacaWidget *) val)->v_wdata = wdata;
 }
 
 /* the name of the manifest file, referencing other files in the state

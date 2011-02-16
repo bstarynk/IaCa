@@ -723,6 +723,29 @@ iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem *itm)
   return true;
 }
 
+// test if a value is transient
+static inline bool
+iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue *val)
+{
+  if (!du || !val)
+    return true;
+  g_assert (du->du_magic == IACA_DUMPER_MAGIC);
+  switch (val->v_kind)
+    {
+    case IACAV_ITEM:
+      return iaca_dump_item_is_transient (du, (IacaItem *) val);
+    case IACAV_INTEGER:
+    case IACAV_STRING:
+    case IACAV_SET:
+      return false;
+    case IACAV_NODE:
+      return iaca_dump_item_is_transient (du, ((IacaNode *) val)->v_conn);
+    case IACAV_WIDGET:
+    default:
+      return true;
+    }
+}
+
 // forward declaration
 void iaca_dump_scan_value (struct iacadumper_st *du, IacaValue *val);
 
@@ -746,6 +769,8 @@ iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
 	if (iaca_dump_item_is_transient (du, itattr))
 	  continue;
 	val = iaca_item_attribute_physical_get ((IacaValue *) itm, vattr);
+	if (iaca_dump_value_is_transient (du, val))
+	  continue;
 	(void) iaca_dump_queue_item (du, itattr);
 	iaca_dump_scan_value (du, val);
       }
@@ -862,6 +887,8 @@ scanagain:
     case IACAV_ITEM:
       (void) iaca_dump_queue_item (du, (IacaItem *) val);
       return;
+    case IACAV_WIDGET:
+      return;
     default:
       iaca_error ("unexpected value kind %d", (int) val->v_kind);
     }
@@ -878,7 +905,7 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
   if (!du)
     return NULL;
   g_assert (du->du_magic == IACA_DUMPER_MAGIC);
-  if (!val)
+  if (!val || iaca_dump_value_is_transient (du, val))
     return json_null ();
   switch (val->v_kind)
     {
@@ -942,6 +969,8 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
 	json_object_set (js, "id", json_integer (itm->v_ident));
 	return js;
       }
+    case IACAV_WIDGET:
+      return json_null ();
     default:
       iaca_error ("unexepcted value kind %d", (int) val->v_kind);
     }

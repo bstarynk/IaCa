@@ -1297,6 +1297,52 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
   dic->dic_len--;
 }
 
+
+static void
+iaca_gtkwidget_destroy (GtkWidget *wid, gpointer wd)
+{
+  IacaWidget *wval = wd;
+  if (!wval || wval->v_kind != IACAV_WIDGET || wval->v_widget != wid)
+    return;
+  g_hash_table_remove (iaca.ia_boxwidget_htab, wid);
+  /* make the wval an empty set, so that any function using it won't
+     see the widget! */
+  memset (wval, 0, sizeof (*wval));
+  g_assert (sizeof (IacaSet) <= sizeof (IacaWidget));
+  wval->v_kind = IACAV_SET;
+  ((IacaSet *) wval)->v_cardinal = 0;
+}
+
+// retrieve or make a boxed widget
+IacaWidget *
+iaca_widget_box (GtkWidget *wid)
+{
+  IacaWidget *wval = 0;
+  if (!wid)
+    return NULL;
+  g_assert (GTK_IS_WIDGET (wid));
+  if (!iaca.ia_boxwidget_htab)
+    iaca.ia_boxwidget_htab = g_hash_table_new (g_direct_hash, g_direct_equal);
+  wval = g_hash_table_lookup (iaca.ia_boxwidget_htab, wid);
+  if (wval)
+    {
+      if (wval->v_kind == IACAV_WIDGET)
+	return wval;
+      /* otherwise, the value has been erased */
+      return NULL;
+    }
+  wval = iaca_alloc_data (sizeof (*wval));
+  g_signal_connect (wid, "destroy", G_CALLBACK (iaca_gtkwidget_destroy),
+		    wval);
+  wval->v_widget = wid;
+  g_hash_table_insert (iaca.ia_boxwidget_htab, wid, wval);
+  wval->v_kind = IACAV_WIDGET;
+  return wval;
+}
+
+
+
+
 /* get a dataspace by its name; dataspaces are never freed */
 struct iacadataspace_st *
 iaca_dataspace (const char *name)
