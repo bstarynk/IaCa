@@ -350,7 +350,7 @@ static inline IacaValue *iaca_gobject_data (IacaValue *);
 static inline void iaca_gobject_put_data (IacaValue *val, IacaValue *gdata);
 
 // retrieve or make the boxed gobject of a gtk gobject
-extern IacaGobject *iaca_gobject_box (GObject * gob);
+extern IacaGobject *iaca_gobject_box (GObject *gob);
 #define iacav_gobject_box(Wid) ((IacaValue*)iaca_gobject_box(Wid))
 
 
@@ -735,7 +735,7 @@ iaca_item_pay_load_make_closure (IacaItem *itm,
 
 /* can be passed to g_signal_connect */
 extern void
-iaca_item_pay_load_closure_gobject_do (GObject * gob, IacaItem *cloitm);
+iaca_item_pay_load_closure_gobject_do (GObject *gob, IacaItem *cloitm);
 
 
 

@@ -9,7 +9,7 @@ enum iacagtkinitval_en
 };
 
 static void
-iacafirst_gtkinit (GObject * gob, IacaItem *cloitm)
+iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
 {
   GtkApplication *gapp = GTK_APPLICATION (gob);
   IacaItem *itactivapp = iacac_item (iaca_item_pay_load_closure_nth (cloitm,
@@ -76,7 +76,7 @@ popup_final_dialog (GtkWindow * win, gpointer ptr)
 }
 
 static void
-iacafirst_activateapplication (GObject * gapp, IacaItem *cloitm)
+iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
 {
   GtkApplication *app = GTK_APPLICATION (gapp);
   GtkWindow *win = 0;

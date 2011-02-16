@@ -1299,7 +1299,7 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
 
 
 static void
-iaca_gobject_weaknotify (gpointer data, GObject * oldob)
+iaca_gobject_weaknotify (gpointer data, GObject *oldob)
 {
   IacaGobject *oval = data;
   if (!oval || oval->v_kind != IACAV_GOBJECT || oval->v_gobject != oldob)
@@ -1315,7 +1315,7 @@ iaca_gobject_weaknotify (gpointer data, GObject * oldob)
 
 // retrieve or make a boxed gobject
 IacaGobject *
-iaca_gobject_box (GObject * gob)
+iaca_gobject_box (GObject *gob)
 {
   IacaGobject *gval = 0;
   if (!gob)
@@ -1451,7 +1451,7 @@ iaca_item_pay_load_make_closure_varf (IacaItem *itm,
 
 
 void
-iaca_item_pay_load_closure_gobject_do (GObject * gob, IacaItem *cloitm)
+iaca_item_pay_load_closure_gobject_do (GObject *gob, IacaItem *cloitm)
 {
   const struct iacaclofun_st *cfun = 0;
   struct iacapayloadclosure_st *clo = 0;

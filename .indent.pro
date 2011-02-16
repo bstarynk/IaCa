@@ -5,6 +5,13 @@
 -T IacaNode
 -T IacaSet
 -T IacaItem
+-T IacaGobject
 -T gchar
 -T GtkWidget
+-T GObject
+-T GtkTextBuffer
+-T GtkTextTag
+-T GtkTextView
+-T GtkButton
+-T GtkDialog
 -T json_t
