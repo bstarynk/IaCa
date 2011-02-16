@@ -76,16 +76,49 @@ popup_final_dialog (GtkWindow * win, gpointer ptr)
 }
 
 static void
+save_dialog_cb (GtkWidget *w, gpointer ptr)
+{
+  iaca_debug ("begin");
+}
+
+static void
+quit_dialog_cb (GtkWidget *w, gpointer ptr)
+{
+  iaca_debug ("begin");
+}
+
+static void
 iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
 {
   GtkApplication *app = GTK_APPLICATION (gapp);
   GtkWindow *win = 0;
+  GtkWidget *box = 0;
+  GtkWidget *menubar = 0;
+  GtkWidget *filemenu = 0;
+  GtkWidget *filesubmenu = 0;
+  GtkWidget *savemenu = 0;
+  GtkWidget *quitmenu = 0;
   iaca_debug ("app %p", app);
   g_assert (GTK_IS_APPLICATION (app));
   win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
   g_signal_connect (win, "destroy", G_CALLBACK (popup_final_dialog),
 		    (gpointer) 0);
   gtk_window_set_title (win, "iaca first");
+  gtk_window_set_default_size (win, 580, 400);
+  box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 3);
+  gtk_container_add (GTK_CONTAINER (win), box);
+  menubar = gtk_menu_bar_new ();
+  filemenu = gtk_menu_item_new_with_mnemonic ("_File");
+  filesubmenu = gtk_menu_new ();
+  gtk_menu_item_set_submenu (GTK_MENU_ITEM (filemenu), filesubmenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (menubar), filemenu);
+  savemenu = gtk_menu_item_new_with_mnemonic ("_Save");
+  quitmenu = gtk_menu_item_new_with_mnemonic ("_Quit");
+  g_signal_connect (savemenu, "activate", G_CALLBACK (save_dialog_cb), NULL);
+  g_signal_connect (quitmenu, "activate", G_CALLBACK (quit_dialog_cb), NULL);
+  gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), savemenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), quitmenu);
+  gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
   gtk_window_set_application (win, app);
   gtk_widget_show_all (GTK_WIDGET (win));
 }
