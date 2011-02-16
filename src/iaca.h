@@ -113,7 +113,7 @@ enum iacavaluekind_en
   IACAV_NODE,			/* immutable node value */
   IACAV_SET,			/* immutable dichotomized set of items */
   IACAV_ITEM,			/* [shared mutable] item with payload */
-  IACAV_WIDGET,			/* transient GtkWidget with value */
+  IACAV_GOBJECT,		/* transient Gobject box with value */
 };
 
 //// forward declarations
@@ -123,7 +123,8 @@ typedef struct iacastring_st IacaString;	/// boxed string
 typedef struct iacanode_st IacaNode;	/// node
 typedef struct iacaset_st IacaSet;	/// immutable set
 typedef struct iacaitem_st IacaItem;	/// shared mutable item with payload
-typedef struct iacawidget_st IacaWidget;	//// transient GtkWidget with value
+typedef struct iacagobject_st IacaGobject;	/* transient boxed GObject */
+
 /// every value starts with a discriminating kind
 struct iacavalue_st
 {
@@ -328,28 +329,29 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
 static inline IacaSet *iacac_set (IacaValue *v);
 
 
-/***************** TRANSIENT BOXED WIDGET VALUES ************/
 
-struct iacawidget_st
+/***************** TRANSIENT BOXED GOBJECT VALUES ************/
+
+struct iacagobject_st
 {
-  unsigned v_kind;		/* always IACAV_WIDGET */
-  GtkWidget *v_widget;		/* any Gtk widget - immutable */
-  IacaValue *v_wdata;		/* associated data */
+  unsigned v_kind;		/* always IACAV_GOBJECT */
+  GObject *v_gobject;		/* any Glib gobject - immutable */
+  IacaValue *v_gdata;		/* associated data */
 };
 
-// safe casting to IacaWidget
-static inline IacaWidget *iacac_widget (IacaValue *);
+// safe casting to IacaGobject
+static inline IacaGobject *iacac_gobject (IacaValue *);
 
-// get the associated widget or NULL
-static inline GtkWidget *iaca_widget (IacaValue *);
+// get the associated gobject or NULL
+static inline GObject *iaca_gobject (IacaValue *);
 // get the associated wdata or null
-static inline IacaValue *iaca_widget_data (IacaValue *);
-// set the associated wdata
-static inline void iaca_widget_put_data (IacaValue *val, IacaValue *wdata);
+static inline IacaValue *iaca_gobject_data (IacaValue *);
+// set the associated gdata
+static inline void iaca_gobject_put_data (IacaValue *val, IacaValue *gdata);
 
-// retrieve or make the boxed widget of a gtk widget
-extern IacaWidget *iaca_widget_box (GtkWidget *wid);
-#define iacav_widget_box(Wid) ((IacaValue*)iaca_widget_box(Wid))
+// retrieve or make the boxed gobject of a gtk gobject
+extern IacaGobject *iaca_gobject_box (GObject * gob);
+#define iacav_gobject_box(Wid) ((IacaValue*)iaca_gobject_box(Wid))
 
 
 /***************** SHARED ITEM VALUES ****************/
@@ -854,8 +856,8 @@ extern struct iacastate_st
   /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
      strings */
   GHashTable *ia_clofun_htab;
-  /* hashtable associating GtkWidget* to their boxed values if any */
-  GHashTable *ia_boxwidget_htab;
+  /* hashtable associating GObject* to their boxed values if any */
+  GHashTable *ia_boxgobject_htab;
   /* last item identifier */
   int64_t ia_item_last_ident;
   /* the state directory */
@@ -1366,38 +1368,39 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 }
 
 
-/************* BOXED WIDGET VALUES ***************/
-static inline IacaWidget *
-iacac_widget (IacaValue *val)
+/************* BOXED GOBJECT VALUES ***************/
+static inline IacaGobject *
+iacac_gobject (IacaValue *val)
 {
-  if (!val || val->v_kind != IACAV_WIDGET)
+  if (!val || val->v_kind != IACAV_GOBJECT)
     return NULL;
-  return (IacaWidget *) val;
+  return (IacaGobject *) val;
 }
 
-static inline GtkWidget *
-iaca_widget (IacaValue *val)
+static inline GObject *
+iaca_gobject (IacaValue *val)
 {
-  if (!val || val->v_kind != IACAV_WIDGET)
+  if (!val || val->v_kind != IACAV_GOBJECT)
     return NULL;
-  return ((IacaWidget *) val)->v_widget;
+  return ((IacaGobject *) val)->v_gobject;
 }
 
 static inline IacaValue *
-iaca_widget_data (IacaValue *val)
+iaca_gobject_data (IacaValue *val)
 {
-  if (!val || val->v_kind != IACAV_WIDGET)
+  if (!val || val->v_kind != IACAV_GOBJECT)
     return NULL;
-  return ((IacaWidget *) val)->v_wdata;
+  return ((IacaGobject *) val)->v_gdata;
 }
 
 static inline void
-iaca_widget_put_data (IacaValue *val, IacaValue *wdata)
+iaca_gobject_put_data (IacaValue *val, IacaValue *wdata)
 {
-  if (!val || val->v_kind != IACAV_WIDGET)
+  if (!val || val->v_kind != IACAV_GOBJECT)
     return;
-  ((IacaWidget *) val)->v_wdata = wdata;
+  ((IacaGobject *) val)->v_gdata = wdata;
 }
+
 
 /* the name of the manifest file, referencing other files in the state
    directory */

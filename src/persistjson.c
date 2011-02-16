@@ -730,7 +730,7 @@ iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue *val)
       return false;
     case IACAV_NODE:
       return iaca_dump_item_is_transient (du, ((IacaNode *) val)->v_conn);
-    case IACAV_WIDGET:
+    case IACAV_GOBJECT:
     default:
       return true;
     }
@@ -877,7 +877,7 @@ scanagain:
     case IACAV_ITEM:
       (void) iaca_dump_queue_item (du, (IacaItem *) val);
       return;
-    case IACAV_WIDGET:
+    case IACAV_GOBJECT:
       return;
     default:
       iaca_error ("unexpected value kind %d", (int) val->v_kind);
@@ -959,7 +959,7 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
 	json_object_set (js, "id", json_integer (itm->v_ident));
 	return js;
       }
-    case IACAV_WIDGET:
+    case IACAV_GOBJECT:
       return json_null ();
     default:
       iaca_error ("unexepcted value kind %d", (int) val->v_kind);

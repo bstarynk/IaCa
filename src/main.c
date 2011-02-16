@@ -1299,45 +1299,44 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
 
 
 static void
-iaca_gtkwidget_destroy (GtkWidget *wid, gpointer wd)
+iaca_gobject_weaknotify (gpointer data, GObject * oldob)
 {
-  IacaWidget *wval = wd;
-  if (!wval || wval->v_kind != IACAV_WIDGET || wval->v_widget != wid)
+  IacaGobject *oval = data;
+  if (!oval || oval->v_kind != IACAV_GOBJECT || oval->v_gobject != oldob)
     return;
-  g_hash_table_remove (iaca.ia_boxwidget_htab, wid);
-  /* make the wval an empty set, so that any function using it won't
-     see the widget! */
-  memset (wval, 0, sizeof (*wval));
-  g_assert (sizeof (IacaSet) <= sizeof (IacaWidget));
-  wval->v_kind = IACAV_SET;
-  ((IacaSet *) wval)->v_cardinal = 0;
+  g_hash_table_remove (iaca.ia_boxgobject_htab, oldob);
+  /* make the oval an empty set, so that any function using it won't
+     see the gobject! */
+  memset (oval, 0, sizeof (*oval));
+  g_assert (sizeof (IacaSet) <= sizeof (IacaGobject));
+  oval->v_kind = IACAV_SET;
+  ((IacaSet *) oval)->v_cardinal = 0;
 }
 
-// retrieve or make a boxed widget
-IacaWidget *
-iaca_widget_box (GtkWidget *wid)
+// retrieve or make a boxed gobject
+IacaGobject *
+iaca_gobject_box (GObject * gob)
 {
-  IacaWidget *wval = 0;
-  if (!wid)
+  IacaGobject *gval = 0;
+  if (!gob)
     return NULL;
-  g_assert (GTK_IS_WIDGET (wid));
-  if (!iaca.ia_boxwidget_htab)
-    iaca.ia_boxwidget_htab = g_hash_table_new (g_direct_hash, g_direct_equal);
-  wval = g_hash_table_lookup (iaca.ia_boxwidget_htab, wid);
-  if (wval)
+  if (!iaca.ia_boxgobject_htab)
+    iaca.ia_boxgobject_htab =
+      g_hash_table_new (g_direct_hash, g_direct_equal);
+  gval = g_hash_table_lookup (iaca.ia_boxgobject_htab, gob);
+  if (gval)
     {
-      if (wval->v_kind == IACAV_WIDGET)
-	return wval;
+      if (gval->v_kind == IACAV_GOBJECT && gval->v_gobject == gob)
+	return gval;
       /* otherwise, the value has been erased */
       return NULL;
     }
-  wval = iaca_alloc_data (sizeof (*wval));
-  g_signal_connect (wid, "destroy", G_CALLBACK (iaca_gtkwidget_destroy),
-		    wval);
-  wval->v_widget = wid;
-  g_hash_table_insert (iaca.ia_boxwidget_htab, wid, wval);
-  wval->v_kind = IACAV_WIDGET;
-  return wval;
+  gval = iaca_alloc_data (sizeof (IacaGobject));
+  gval->v_gobject = gob;
+  g_hash_table_insert (iaca.ia_boxgobject_htab, gob, gval);
+  g_object_weak_ref (gob, iaca_gobject_weaknotify, (gpointer) gval);
+  gval->v_kind = IACAV_GOBJECT;
+  return gval;
 }
 
 
