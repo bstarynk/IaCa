@@ -1187,6 +1187,7 @@ iaca_dump (const char *dirpath)
     {
       if (g_mkdir_with_parents (dirpath, 0700))
 	iaca_error ("failed to create dump directory %s - %m", dirpath);
+      iaca_debug ("made directory %s", dirpath);
     };
   datadirpath = g_build_filename (dirpath, "data", NULL);
   if (!g_file_test (datadirpath, G_FILE_TEST_IS_DIR))

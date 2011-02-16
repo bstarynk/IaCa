@@ -88,7 +88,7 @@ save_dialog_cb (GtkWidget *w, gpointer ptr)
      GTK_DIALOG_DESTROY_WITH_PARENT,
      GTK_MESSAGE_QUESTION,
      GTK_BUTTONS_NONE,
-     "Save state to directory <tt>%s</tt> ?", iaca.ia_statedir);
+     "<b>Save state</b> to directory <tt>%s</tt> ?", iaca.ia_statedir);
   gtk_dialog_add_buttons (GTK_DIALOG (dial),
 			  GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
 			  GTK_STOCK_QUIT, GTK_RESPONSE_NO,
@@ -98,6 +98,7 @@ save_dialog_cb (GtkWidget *w, gpointer ptr)
 					      "<i>Quit</i> to save the state and quit,\n"
 					      "<i>Cancel</i> to continue without saving",
 					      iaca.ia_statedir);
+  gtk_widget_show_all (GTK_WIDGET (dial));
   resp = gtk_dialog_run (GTK_DIALOG (dial));
   iaca_debug ("resp %d", resp);
   switch (resp)
@@ -122,6 +123,34 @@ save_dialog_cb (GtkWidget *w, gpointer ptr)
 }
 
 static void
+saveas_dialog_cb (GtkWidget *w, gpointer ptr)
+{
+  GtkWidget *dial = 0;
+  GtkWindow *win = ptr;
+  gint resp = 0;
+  iaca_debug ("begin");
+  g_assert (GTK_IS_WINDOW (win));
+  dial = gtk_file_chooser_dialog_new ("Save Iaca state to...",
+				      win,
+				      GTK_FILE_CHOOSER_ACTION_CREATE_FOLDER,
+				      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+				      GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
+				      NULL);
+  gtk_widget_show_all (GTK_WIDGET (dial));
+  resp = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("resp %d", resp);
+  if (resp == GTK_RESPONSE_ACCEPT)
+    {
+      gchar *fildir = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dial));
+      iaca_debug ("fildir %s", fildir);
+      iaca_dump (fildir);
+      g_free (fildir);
+    }
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+}
+
+
+static void
 quit_dialog_cb (GtkWidget *w, gpointer ptr)
 {
   GtkWidget *dial = 0;
@@ -132,14 +161,15 @@ quit_dialog_cb (GtkWidget *w, gpointer ptr)
   dial = gtk_message_dialog_new_with_markup
     (win,
      GTK_DIALOG_DESTROY_WITH_PARENT,
-     GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE, "Quit without saving state ?");
-  gtk_dialog_add_buttons (GTK_DIALOG (dial),
-			  GTK_STOCK_QUIT, GTK_RESPONSE_NO,
+     GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE,
+     "<b>Quit without saving</b> state ?");
+  gtk_dialog_add_buttons (GTK_DIALOG (dial), GTK_STOCK_QUIT, GTK_RESPONSE_NO,
 			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
-  gtk_message_dialog_format_secondary_markup
-    (GTK_MESSAGE_DIALOG (dial),
-     "<i>Quit</i> without saving the state to <tt>%s</tt>,\n"
-     "<i>Cancel</i> to continue", iaca.ia_statedir);
+  gtk_message_dialog_format_secondary_markup (GTK_MESSAGE_DIALOG (dial),
+					      "<i>Quit</i> without saving the state to <tt>%s</tt>,\n"
+					      "<i>Cancel</i> to continue",
+					      iaca.ia_statedir);
+  gtk_widget_show_all (GTK_WIDGET (dial));
   resp = gtk_dialog_run (GTK_DIALOG (dial));
   iaca_debug ("resp %d", resp);
   switch (resp)
@@ -167,6 +197,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   GtkWidget *filemenu = 0;
   GtkWidget *filesubmenu = 0;
   GtkWidget *savemenu = 0;
+  GtkWidget *saveasmenu = 0;
   GtkWidget *quitmenu = 0;
   iaca_debug ("app %p", app);
   g_assert (GTK_IS_APPLICATION (app));
@@ -183,10 +214,14 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_menu_item_set_submenu (GTK_MENU_ITEM (filemenu), filesubmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (menubar), filemenu);
   savemenu = gtk_menu_item_new_with_mnemonic ("_Save");
+  saveasmenu = gtk_menu_item_new_with_mnemonic ("Save _As");
   quitmenu = gtk_menu_item_new_with_mnemonic ("_Quit");
   g_signal_connect (savemenu, "activate", G_CALLBACK (save_dialog_cb), win);
+  g_signal_connect (saveasmenu, "activate", G_CALLBACK (saveas_dialog_cb),
+		    win);
   g_signal_connect (quitmenu, "activate", G_CALLBACK (quit_dialog_cb), win);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), savemenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), saveasmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), quitmenu);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
   gtk_window_set_application (win, app);
