@@ -78,13 +78,83 @@ popup_final_dialog (GtkWindow * win, gpointer ptr)
 static void
 save_dialog_cb (GtkWidget *w, gpointer ptr)
 {
+  GtkWidget *dial = 0;
+  GtkWindow *win = ptr;
+  gint resp = 0;
   iaca_debug ("begin");
+  g_assert (GTK_IS_WINDOW (win));
+  dial = gtk_message_dialog_new_with_markup
+    (win,
+     GTK_DIALOG_DESTROY_WITH_PARENT,
+     GTK_MESSAGE_QUESTION,
+     GTK_BUTTONS_NONE,
+     "Save state to directory <tt>%s</tt> ?", iaca.ia_statedir);
+  gtk_dialog_add_buttons (GTK_DIALOG (dial),
+			  GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
+			  GTK_STOCK_QUIT, GTK_RESPONSE_NO,
+			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
+  gtk_message_dialog_format_secondary_markup (GTK_MESSAGE_DIALOG (dial),
+					      "<i>Save</i> to save the state to directory <tt>%s</tt> and continue,\n"
+					      "<i>Quit</i> to save the state and quit,\n"
+					      "<i>Cancel</i> to continue without saving",
+					      iaca.ia_statedir);
+  resp = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("resp %d", resp);
+  switch (resp)
+    {
+    case GTK_RESPONSE_ACCEPT:
+      /* save and continue */
+      iaca_debug ("save to %s and continue", iaca.ia_statedir);
+      iaca_dump (iaca.ia_statedir);
+      break;
+    case GTK_RESPONSE_NO:
+      /* save and quit */
+      iaca_debug ("save to %s and quit", iaca.ia_statedir);
+      iaca_dump (iaca.ia_statedir);
+      gtk_main_quit ();
+      break;
+    default:
+      /* continue without saving */
+      iaca_debug ("continue without saving");
+      break;
+    }
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
 }
 
 static void
 quit_dialog_cb (GtkWidget *w, gpointer ptr)
 {
+  GtkWidget *dial = 0;
+  GtkWindow *win = ptr;
+  gint resp = 0;
   iaca_debug ("begin");
+  g_assert (GTK_IS_WINDOW (win));
+  dial = gtk_message_dialog_new_with_markup
+    (win,
+     GTK_DIALOG_DESTROY_WITH_PARENT,
+     GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE, "Quit without saving state ?");
+  gtk_dialog_add_buttons (GTK_DIALOG (dial),
+			  GTK_STOCK_QUIT, GTK_RESPONSE_NO,
+			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
+  gtk_message_dialog_format_secondary_markup
+    (GTK_MESSAGE_DIALOG (dial),
+     "<i>Quit</i> without saving the state to <tt>%s</tt>,\n"
+     "<i>Cancel</i> to continue", iaca.ia_statedir);
+  resp = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("resp %d", resp);
+  switch (resp)
+    {
+    case GTK_RESPONSE_NO:
+      /* quit */
+      iaca_debug ("quit without saving");
+      gtk_main_quit ();
+      break;
+    default:
+      /* continue without saving */
+      iaca_debug ("continue without saving");
+      break;
+    }
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
 }
 
 static void
@@ -114,8 +184,8 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_menu_shell_append (GTK_MENU_SHELL (menubar), filemenu);
   savemenu = gtk_menu_item_new_with_mnemonic ("_Save");
   quitmenu = gtk_menu_item_new_with_mnemonic ("_Quit");
-  g_signal_connect (savemenu, "activate", G_CALLBACK (save_dialog_cb), NULL);
-  g_signal_connect (quitmenu, "activate", G_CALLBACK (quit_dialog_cb), NULL);
+  g_signal_connect (savemenu, "activate", G_CALLBACK (save_dialog_cb), win);
+  g_signal_connect (quitmenu, "activate", G_CALLBACK (quit_dialog_cb), win);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), savemenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), quitmenu);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
