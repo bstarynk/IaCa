@@ -140,7 +140,7 @@ iaca_json_error_printf_at (int lin, struct iacaloader_st *ld, const char *fmt,
 
 
 IacaValue *
-iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
+iaca_json_to_value (struct iacaloader_st *ld, const json_t *js)
 {
   IacaValue *res = 0;
   int ty = 0;
@@ -254,8 +254,7 @@ iaca_json_to_value (struct iacaloader_st *ld, const json_t * js)
 
 
 static void
-iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem * itm,
-			 json_t * js)
+iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 {
   int prjf = 0;
   g_assert (ld && ld->ld_magic == IACA_LOADER_MAGIC);
@@ -376,7 +375,7 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem * itm,
 
 
 static void
-iaca_load_item_content (struct iacaloader_st *ld, json_t * js)
+iaca_load_item_content (struct iacaloader_st *ld, json_t *js)
 {
   long long id = 0;
   IacaItem *itm = 0;
@@ -684,7 +683,7 @@ iaca_load (const char *dirpath)
 // routine to queue an item to be scanned for dumping; return true if
 // the item is transient and should be ignored
 bool
-iaca_dump_queue_item (struct iacadumper_st *du, IacaItem * itm)
+iaca_dump_queue_item (struct iacadumper_st *du, IacaItem *itm)
 {
   IacaItem *fnditm = 0;
   if (!du || !itm || itm->v_kind != IACAV_ITEM)
@@ -716,7 +715,7 @@ iaca_dump_queue_item (struct iacadumper_st *du, IacaItem * itm)
 
 // test if an item is transient, that is should not be dumped!
 static inline bool
-iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem * itm)
+iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem *itm)
 {
   if (!du || !itm)
     return true;
@@ -732,7 +731,7 @@ iaca_dump_item_is_transient (struct iacadumper_st *du, IacaItem * itm)
 
 // test if a value is transient
 static inline bool
-iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue * val)
+iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue *val)
 {
   if (!du || !val)
     return true;
@@ -754,11 +753,11 @@ iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue * val)
 }
 
 // forward declaration
-void iaca_dump_scan_value (struct iacadumper_st *du, IacaValue * val);
+void iaca_dump_scan_value (struct iacadumper_st *du, IacaValue *val);
 
 // scan the content of an item
 void
-iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem * itm)
+iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
 {
   if (!du || !itm)
     return;
@@ -856,7 +855,7 @@ iaca_dump_scan_loop (struct iacadumper_st *du)
 
 // recursive routine to scan a data for dumping
 void
-iaca_dump_scan_value (struct iacadumper_st *du, IacaValue * val)
+iaca_dump_scan_value (struct iacadumper_st *du, IacaValue *val)
 {
   if (!du)
     return;
@@ -906,7 +905,7 @@ scanagain:
 // dumping
 
 json_t *
-iaca_dump_value_json (struct iacadumper_st *du, IacaValue * val)
+iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
 {
   json_t *js = 0;
   if (!du)
@@ -984,7 +983,7 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue * val)
 }
 
 json_t *
-iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem * itm)
+iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 {
   json_t *js = 0;
   if (!du || !itm)
@@ -1105,7 +1104,7 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem * itm)
 }
 
 json_t *
-iaca_dump_item_content_json (struct iacadumper_st * du, IacaItem * itm)
+iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
 {
   json_t *js = 0;
   json_t *jsattr = 0;
@@ -1225,19 +1224,23 @@ iaca_dump (const char *dirpath)
   dum.du_curitem = NULL;
   /* queue every top level item, or scan every top level value */
   // the top dictionnary
-  iaca_debug("topdictitm %p #%lld", 
-	     iaca.ia_topdictitm, 
-	     (long long) (iaca.ia_topdictitm?iaca.ia_topdictitm->v_ident:0LL));
+  iaca_debug ("topdictitm %p #%lld",
+	      iaca.ia_topdictitm,
+	      (long long) (iaca.ia_topdictitm ? iaca.
+			   ia_topdictitm->v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
   // the data space hook
-  iaca_debug("dataspacehookitm %p #%lld", 
-	     iaca.ia_dataspacehookitm, 
-	     (long long) (iaca.ia_dataspacehookitm?iaca.ia_dataspacehookitm->v_ident:0LL));
+  iaca_debug ("dataspacehookitm %p #%lld",
+	      iaca.ia_dataspacehookitm,
+	      (long long) (iaca.
+			   ia_dataspacehookitm ? iaca.ia_dataspacehookitm->
+			   v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_dataspacehookitm);
   // the gtk initializer
-  iaca_debug("gtkinititm %p #%lld", 
-	     iaca.ia_gtkinititm, 
-	     (long long) (iaca.ia_gtkinititm?iaca.ia_gtkinititm->v_ident:0LL));
+  iaca_debug ("gtkinititm %p #%lld",
+	      iaca.ia_gtkinititm,
+	      (long long) (iaca.ia_gtkinititm ? iaca.
+			   ia_gtkinititm->v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_gtkinititm);
   /* initialize the module tree */
   dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
