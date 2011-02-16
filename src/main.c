@@ -1519,6 +1519,8 @@ iaca_initialize_modules (void)
 static GOptionEntry iaca_options[] = {
   {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
    "state directory with data and code", "STATEDIR"},
+  {"debug", 'D', 0, G_OPTION_ARG_NONE, (gpointer) & iaca.ia_debug,
+   "debug message", NULL},
   {"xtramodule", 'X', 0, G_OPTION_ARG_CALLBACK, (gpointer) iaca_xtra_module,
    "extra module to load", "XTRAMODULE"},
   {NULL}

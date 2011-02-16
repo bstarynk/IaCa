@@ -85,6 +85,7 @@ g_error("%s:%d <%s> " Fmt "\n",			\
 
 /* debug message: */
 #define iaca_debug_at(Fil,Lin,Fmt,...) do {	\
+  if (iaca.ia_debug)				\
     g_debug ("%s:%d <%s> " Fmt,			\
 	     basename(Fil), Lin, __func__,	\
 	     ##__VA_ARGS__); } while(0)
@@ -472,10 +473,12 @@ enum iacaclofunsig_en
   /* activation or other action signal of a GObject, or even of some
      GtkWidget like GtkButton... */
   IACACFSIG_gobject_do,
-  /* application to two items */
-  IACACFSIG_two_items,
   /* application to one value */
   IACACFSIG_one_value,
+  /* application to two values */
+  IACACFSIG_two_values,
+  /* application to three values */
+  IACACFSIG_three_values,
 };
 
 /* closure function structures are always const and statically
@@ -503,12 +506,16 @@ struct iacaclofun_st
        the button, menu item, ... */
     void (*cfunu_gobject_do) (GObject *, IacaItem *);
 #define cfun_gobject_do cfun_un.cfunu_gobject_do
-    /* when IACACFSIG_two_items  (it1, it2, cloitm) */
-    void (*cfunu_two_items) (IacaItem *, IacaItem *, IacaItem *);
-#define cfun_two_items cfun_un.cfunu_two_items
     /* when IACACFSIG_one_value (v1, cloitm) */
-    void (*cfunu_one_value) (IacaValue *, IacaItem *);
+    IacaValue *(*cfunu_one_value) (IacaValue *, IacaItem *);
 #define cfun_one_value cfun_un.cfunu_one_value
+    /* when IACACFSIG_two_values (v1, v2, cloitm) */
+    IacaValue *(*cfunu_two_values) (IacaValue *, IacaValue *, IacaItem *);
+#define cfun_two_values cfun_un.cfunu_two_values
+    /* when IACACFSIG_three_values (v1, v2, v3, cloitm) */
+    IacaValue *(*cfunu_three_values) (IacaValue *, IacaValue *, IacaValue *,
+				      IacaItem *);
+#define cfun_three_values cfun_un.cfunu_three_values
   } cfun_un;
   /* The name is FOO when the entire iacaclofun_st structure is
      iacafun_FOO: */
@@ -726,46 +733,64 @@ iaca_item_pay_load_make_closure (IacaItem *itm,
 extern void
 iaca_item_pay_load_closure_gobject_do (GObject * gob, IacaItem *cloitm);
 
-static inline void
-iaca_item_pay_load_closure_two_items (IacaItem *it1, IacaItem *it2,
-				      IacaItem *cloitm)
-{
-  const struct iacaclofun_st *cfun = 0;
-  struct iacapayloadclosure_st *clo = 0;
-  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
-    return;
-  /* ensure it1 & it2 are either nil or items */
-  if (it1 && it1->v_kind != IACAV_ITEM)
-    return;
-  if (it2 && it2->v_kind != IACAV_ITEM)
-    return;
-  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
-      || !(clo = cloitm->v_payloadclosure))
-    return;
-  if (!(cfun = clo->clo_fun))
-    return;
-  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
-  if (cfun->cfun_sig != IACACFSIG_two_items || !cfun->cfun_two_items)
-    return;
-  cfun->cfun_two_items (it1, it2, cloitm);
-}
 
-static inline void
+
+static inline IacaValue *
 iaca_item_pay_load_closure_one_value (IacaValue *v1, IacaItem *cloitm)
 {
   const struct iacaclofun_st *cfun = 0;
   struct iacapayloadclosure_st *clo = 0;
   if (!cloitm || cloitm->v_kind != IACAV_ITEM)
-    return;
+    return NULL;
   if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
       || !(clo = cloitm->v_payloadclosure))
-    return;
+    return NULL;
   if (!(cfun = clo->clo_fun))
-    return;
+    return NULL;
   g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
   if (cfun->cfun_sig != IACACFSIG_one_value || !cfun->cfun_one_value)
-    return;
-  cfun->cfun_one_value (v1, cloitm);
+    return NULL;
+  return cfun->cfun_one_value (v1, cloitm);
+}
+
+
+static inline IacaValue *
+iaca_item_pay_load_closure_two_values (IacaValue *v1, IacaValue *v2,
+				       IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return NULL;
+  if (!(cfun = clo->clo_fun))
+    return NULL;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_two_values || !cfun->cfun_two_values)
+    return NULL;
+  return cfun->cfun_two_values (v1, v2, cloitm);
+}
+
+
+static inline IacaValue *
+iaca_item_pay_load_closure_three_values (IacaValue *v1, IacaValue *v2,
+					 IacaValue *v3, IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return NULL;
+  if (!(cfun = clo->clo_fun))
+    return NULL;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_three_values || !cfun->cfun_three_values)
+    return NULL;
+  return cfun->cfun_three_values (v1, v2, v3, cloitm);
 }
 
 /* the number of arguments should correspond to cfun */
@@ -845,6 +870,8 @@ extern struct iacastate_st
   IacaItem *ia_moduledumpitm;
   /* the GTK application, if any */
   GtkApplication *ia_gtkapplication;
+  /* flag for debug messages */
+  gboolean ia_debug;
 } iaca;
 /*****************************************************************************
  *****************************************************************************
