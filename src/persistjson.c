@@ -104,7 +104,8 @@ iaca_retrieve_loaded_item (struct iacaloader_st *ld, int64_t id)
   itm->v_payloadptr = NULL;
   itm->v_itemcontent = NULL;
   g_hash_table_insert (ld->ld_itemhtab, &itm->v_ident, itm);
-  iaca_debug ("new id %lld itm %p #%lld", id, itm, iaca_item_ident (itm));
+  iaca_debug ("new id %lld itm %p #%lld", (long long) id, itm,
+	      (long long) iaca_item_ident (itm));
   return itm;
 }
 
