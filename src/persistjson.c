@@ -1174,7 +1174,11 @@ iaca_dump (const char *dirpath)
   char *bakmanifestpath = 0;
   char *datadirpath = 0;
   time_t now = 0;
+  char nowbuf[64];
   time (&now);
+  memset (nowbuf, 0, sizeof (nowbuf));
+  strftime (nowbuf, sizeof (nowbuf) - 1, "%Y-%b-%d %H:%M:%S %Z",
+	    gmtime (&now));
   memset (&dum, 0, sizeof (dum));
   if (!dirpath || !dirpath[0])
     dirpath = iaca.ia_statedir;
@@ -1199,7 +1203,7 @@ iaca_dump (const char *dirpath)
   dum.du_manifile = fopen (tmpmanifestpath, "w");
   if (!dum.du_manifile)
     iaca_error ("failed to open manifest %s - %m", tmpmanifestpath);
-  fprintf (dum.du_manifile, "# file %s\n", manifestpath);
+  fprintf (dum.du_manifile, "# file %s generated %s\n", manifestpath, nowbuf);
   dum.du_magic = IACA_DUMPER_MAGIC;
   dum.du_dirname = dirpath;
   dum.du_scanqueue = g_queue_new ();
