@@ -344,6 +344,8 @@ static inline IacaGobject *iacac_gobject (IacaValue *);
 
 // get the associated gobject or NULL
 static inline GObject *iaca_gobject (IacaValue *);
+#define iaca_gtkwidget(V) GTK_WIDGET(iaca_gobject(V))
+
 // get the associated wdata or null
 static inline IacaValue *iaca_gobject_data (IacaValue *);
 // set the associated gdata
@@ -421,7 +423,7 @@ struct iacaitem_st
 static inline IacaItem *iacac_item (IacaValue *v);
 
 static inline int64_t iaca_item_ident (IacaItem *it);
-
+#define iaca_item_identll(Itm) ((long long) iaca_item_ident((Itm)))
 struct iacapayloadvector_st
 {
   unsigned vec_siz;		/* allocated size */
@@ -1225,7 +1227,6 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
     {
       IacaString *str = 0;
       int cmp = 0;
-      md = (lo + hi) / 2;
       str = dic->dic_tab[md].de_str;
       g_assert (str != 0);
       cmp = strcmp (str->v_str, name);

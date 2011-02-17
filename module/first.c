@@ -22,6 +22,17 @@
 
 
 static struct iacadataspace_st *iacafirst_dsp;
+
+/* the boxed gobject value for the top level window */
+static IacaValue *iacafirst_valwin;
+/* the boxed gobject value for the top notebook */
+static IacaValue *iacafirst_valnotebook;
+/* the boxed gobject value for the top entry */
+static IacaValue *iacafirst_valentry;
+
+/* the transient item associating edited items to their widget */
+static IacaItem *iacafirst_assocedititm;
+
 /// initialize the application
 enum iacagtkinitval_en
 {
@@ -210,6 +221,76 @@ quit_dialog_cb (GtkWidget *w, gpointer ptr)
   gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
 }
 
+
+
+static void
+edit_named_cb (GtkWidget *menu, gpointer data)
+{
+  GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
+  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
+  GtkWidget *dial = 0;
+  const gchar *txt = 0;
+  const gchar *endtxt = 0;
+  IacaItem *nameditm = 0;
+  bool goodname = 0;
+  int resp = 0;
+  g_assert (GTK_IS_ENTRY (entry));
+  g_assert (GTK_IS_WINDOW (win));
+  txt = gtk_entry_get_text (entry);
+  iaca_debug ("txt '%s'", txt);
+  if (!g_utf8_validate (txt, -1, &endtxt))
+    iaca_error ("invalid UTF8 entry text '%s'", txt);
+  goodname = endtxt > txt;
+  for (const gchar *p = txt; p < endtxt && goodname; p = g_utf8_next_char (p))
+    {
+      gunichar c = g_utf8_get_char (p);
+      goodname = g_unichar_isalpha (c) || c == '_';
+    }
+  iaca_debug ("text is %s", goodname ? "good name" : "bad");
+  if (!goodname)
+    {
+      dial = gtk_message_dialog_new_with_markup
+	(win,
+	 GTK_DIALOG_DESTROY_WITH_PARENT,
+	 GTK_MESSAGE_WARNING,
+	 GTK_BUTTONS_OK, "<b>invalid name</b> <tt>%s</tt>", txt);
+      gtk_message_dialog_format_secondary_markup
+	(GTK_MESSAGE_DIALOG (dial),
+	 "A name should contain only <i>letters</i> or underscores <tt>_</tt>");
+      gtk_widget_show_all (GTK_WIDGET (dial));
+      resp = gtk_dialog_run (GTK_DIALOG (dial));
+      iaca_debug ("resp %d", resp);
+      gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+      gtk_entry_set_text (entry, "");
+      return;
+    }
+  nameditm = iacac_item (iaca_item_pay_load_dictionnary_get
+			 (iaca.ia_topdictitm, txt));
+  iaca_debug ("nameditm %p #%lld", nameditm, iaca_item_identll (nameditm));
+  if (!nameditm)
+    {
+      dial = gtk_message_dialog_new_with_markup
+	(win,
+	 GTK_DIALOG_DESTROY_WITH_PARENT,
+	 GTK_MESSAGE_QUESTION,
+	 GTK_BUTTONS_OK_CANCEL,
+	 "<b>Create new item</b> named <tt>%s</tt> ?", txt);
+      gtk_message_dialog_format_secondary_markup
+	(GTK_MESSAGE_DIALOG (dial),
+	 "<i>ok</i> to create then edit a new named item,\n"
+	 "<i>cancel</i> to continue without changes.");
+      gtk_widget_show_all (GTK_WIDGET (dial));
+      resp = gtk_dialog_run (GTK_DIALOG (dial));
+      iaca_debug ("resp %d", resp);
+      if (resp == GTK_RESPONSE_OK)
+	{
+	  iaca_error ("creation of new item '%s' unimplemented", txt);
+	}
+      gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+    }
+  iaca_error ("unimplemented");
+}
+
 static void
 iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
 {
@@ -225,6 +306,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   GtkWidget *editmenu = 0;
   GtkWidget *copymenu = 0;
   GtkWidget *cutmenu = 0;
+  GtkWidget *namedmenu = 0;
   GtkWidget *pastemenu = 0;
   GtkWidget *editsubmenu = 0;
   GtkWidget *hbox = 0;
@@ -234,6 +316,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   iaca_debug ("app %p", app);
   g_assert (GTK_IS_APPLICATION (app));
   win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
+  iacafirst_valwin = iacav_gobject_box (G_OBJECT (win));
   g_signal_connect (win, "destroy", G_CALLBACK (popup_final_dialog),
 		    (gpointer) 0);
   gtk_window_set_title (win, "iaca first");
@@ -260,12 +343,15 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   editsubmenu = gtk_menu_new ();
   gtk_menu_item_set_submenu (GTK_MENU_ITEM (editmenu), editsubmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (menubar), editmenu);
+  namedmenu = gtk_menu_item_new_with_mnemonic ("_Named");
   copymenu = gtk_menu_item_new_with_mnemonic ("_Copy");
   cutmenu = gtk_menu_item_new_with_mnemonic ("C_ut");
   pastemenu = gtk_menu_item_new_with_mnemonic ("_Paste");
+  gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), namedmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), copymenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), cutmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), pastemenu);
+  g_signal_connect (namedmenu, "activate", G_CALLBACK (edit_named_cb), NULL);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
   //// create the hbox
   hbox = gtk_hbox_new (FALSE, 4);
@@ -278,10 +364,13 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
     g_free (markup);
     gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 2);
     entry = gtk_entry_new ();
+    iacafirst_valentry = iacav_gobject_box (G_OBJECT (entry));
     gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
   }
-  //// create the notebook
+  //// create the notebook and the association of edited items
   notebook = gtk_notebook_new ();
+  iacafirst_valnotebook = iacav_gobject_box (G_OBJECT (notebook));
+  iacafirst_assocedititm = iaca_item_make (iaca.ia_transientdataspace);
   gtk_box_pack_start (GTK_BOX (box), notebook, TRUE, TRUE, 2);
   ////
   gtk_window_set_application (win, app);
