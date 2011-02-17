@@ -1530,6 +1530,7 @@ main (int argc, char **argv)
 {
   int exitstatus = 0;
   GError *err = NULL;
+  char *origstatedir = 0;
   GC_INIT ();
   iaca.ia_statedir = ".";
   if (!gtk_init_with_args
@@ -1540,6 +1541,8 @@ main (int argc, char **argv)
   iaca.ia_progmodule = g_module_open (NULL, 0);
   if (!iaca.ia_progmodule)
     iaca_error ("failed to get full program module - %s", g_module_error ());
+  origstatedir = iaca.ia_statedir;
+  iaca.ia_statedir = realpath (origstatedir, NULL);
   iaca_load (iaca.ia_statedir);
   iaca.ia_transientdataspace = g_malloc0 (sizeof (struct iacadataspace_st));
   iaca.ia_transientdataspace->dsp_name = iaca_string_make ("*");

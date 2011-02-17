@@ -20,12 +20,15 @@
 
 #include "iaca.h"
 
+
+static struct iacadataspace_st *iacafirst_dsp;
 /// initialize the application
 enum iacagtkinitval_en
 {
   IACAGTKINITVAL_ACTIVEAPPL,
   IACAGTKINITVAL__LAST
 };
+
 
 static void
 iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
@@ -107,15 +110,16 @@ save_dialog_cb (GtkWidget *w, gpointer ptr)
      GTK_DIALOG_DESTROY_WITH_PARENT,
      GTK_MESSAGE_QUESTION,
      GTK_BUTTONS_NONE,
-     "<b>Save state</b> to directory <tt>%s</tt> ?", iaca.ia_statedir);
-  gtk_dialog_add_buttons (GTK_DIALOG (dial),
-			  GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
-			  GTK_STOCK_QUIT, GTK_RESPONSE_NO,
-			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
+     "<b>Save IaCa state</b> to directory\n <tt>%s</tt> ?\n",
+     iaca.ia_statedir);
+  gtk_dialog_add_buttons (GTK_DIALOG (dial), GTK_STOCK_SAVE,
+			  GTK_RESPONSE_ACCEPT, GTK_STOCK_QUIT,
+			  GTK_RESPONSE_NO, GTK_STOCK_CANCEL,
+			  GTK_RESPONSE_REJECT, NULL);
   gtk_message_dialog_format_secondary_markup (GTK_MESSAGE_DIALOG (dial),
-					      "<i>Save</i> to save the state to directory <tt>%s</tt> and continue,\n"
-					      "<i>Quit</i> to save the state and quit,\n"
-					      "<i>Cancel</i> to continue without saving",
+					      "<i>Save</i> to save the state to directory\n <tt>%s</tt> and continue,\n\n"
+					      "<i>Quit</i> to save the state and quit,\n\n"
+					      "<i>Cancel</i> to continue without saving\n",
 					      iaca.ia_statedir);
   gtk_widget_show_all (GTK_WIDGET (dial));
   resp = gtk_dialog_run (GTK_DIALOG (dial));
@@ -181,11 +185,11 @@ quit_dialog_cb (GtkWidget *w, gpointer ptr)
     (win,
      GTK_DIALOG_DESTROY_WITH_PARENT,
      GTK_MESSAGE_QUESTION, GTK_BUTTONS_NONE,
-     "<b>Quit without saving</b> state ?");
+     "<b>Quit IaCa without saving</b> state ?");
   gtk_dialog_add_buttons (GTK_DIALOG (dial), GTK_STOCK_QUIT, GTK_RESPONSE_NO,
 			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
   gtk_message_dialog_format_secondary_markup (GTK_MESSAGE_DIALOG (dial),
-					      "<i>Quit</i> without saving the state to <tt>%s</tt>,\n"
+					      "<i>Quit</i> without saving the state\n to <tt>%s</tt>,\n"
 					      "<i>Cancel</i> to continue",
 					      iaca.ia_statedir);
   gtk_widget_show_all (GTK_WIDGET (dial));
@@ -218,6 +222,15 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   GtkWidget *savemenu = 0;
   GtkWidget *saveasmenu = 0;
   GtkWidget *quitmenu = 0;
+  GtkWidget *editmenu = 0;
+  GtkWidget *copymenu = 0;
+  GtkWidget *cutmenu = 0;
+  GtkWidget *pastemenu = 0;
+  GtkWidget *editsubmenu = 0;
+  GtkWidget *hbox = 0;
+  GtkWidget *label = 0;
+  GtkWidget *entry = 0;
+  GtkWidget *notebook = 0;
   iaca_debug ("app %p", app);
   g_assert (GTK_IS_APPLICATION (app));
   win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
@@ -227,6 +240,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_window_set_default_size (win, 580, 400);
   box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 3);
   gtk_container_add (GTK_CONTAINER (win), box);
+  /// create the menubar
   menubar = gtk_menu_bar_new ();
   filemenu = gtk_menu_item_new_with_mnemonic ("_File");
   filesubmenu = gtk_menu_new ();
@@ -242,7 +256,34 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), savemenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), saveasmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (filesubmenu), quitmenu);
+  editmenu = gtk_menu_item_new_with_mnemonic ("Edit");
+  editsubmenu = gtk_menu_new ();
+  gtk_menu_item_set_submenu (GTK_MENU_ITEM (editmenu), editsubmenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (menubar), editmenu);
+  copymenu = gtk_menu_item_new_with_mnemonic ("_Copy");
+  cutmenu = gtk_menu_item_new_with_mnemonic ("C_ut");
+  pastemenu = gtk_menu_item_new_with_mnemonic ("_Paste");
+  gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), copymenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), cutmenu);
+  gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), pastemenu);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
+  //// create the hbox
+  hbox = gtk_hbox_new (FALSE, 4);
+  gtk_box_pack_start (GTK_BOX (box), hbox, FALSE, FALSE, 2);
+  {
+    char *markup = g_markup_printf_escaped ("<i>Iaca</i> <small>(%d)</small>",
+					    (int) getpid ());
+    label = gtk_label_new (NULL);
+    gtk_label_set_markup (GTK_LABEL (label), markup);
+    g_free (markup);
+    gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 2);
+    entry = gtk_entry_new ();
+    gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
+  }
+  //// create the notebook
+  notebook = gtk_notebook_new ();
+  gtk_box_pack_start (GTK_BOX (box), notebook, TRUE, TRUE, 2);
+  ////
   gtk_window_set_application (win, app);
   gtk_widget_show_all (GTK_WIDGET (win));
 }
@@ -257,18 +298,36 @@ iacamod_first_init1 (void)
   IacaItem *itdict = 0;
   IacaItem *itgtkinit = 0;
   IacaItem *itactivappl = 0;
-  struct iacadataspace_st *spf = iaca_dataspace ("firstspace");
-  iaca_debug ("init1 of first spf=%p", spf);
+  IacaItem *itname = 0;
+  iacafirst_dsp = iaca_dataspace ("firstspace");
+  iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
     {
-      iaca.ia_topdictitm = itdict = iaca_item_make (spf);
+      iaca.ia_topdictitm = itdict = iaca_item_make (iacafirst_dsp);
       iaca_item_pay_load_reserve_dictionnary (itdict, 53);
       iaca_item_pay_load_put_dictionnary_str (itdict, "the_dictionnary",
 					      (IacaValue *) itdict);
     }
+  if (!
+      (itname =
+       iacac_item (iaca_item_pay_load_dictionnary_get (itdict, "name"))))
+    {
+      itname = iaca_item_make (iacafirst_dsp);
+      iaca_debug ("itname %p #%lld", itname,
+		  (long long) iaca_item_ident (itname));
+      iaca_item_pay_load_put_dictionnary_str (itdict, "name",
+					      (IacaValue *) itname);
+      iaca_item_physical_put ((IacaValue *) itdict, (IacaValue *) itname,
+			      iacav_string_make ("the_dictionnary"));
+      iaca_item_physical_put ((IacaValue *) itname, (IacaValue *) itname,
+			      iacav_string_make ("name"));
+    }
+  else
+    iaca_debug ("got itname %p #%lld", itname,
+		(long long) iaca_item_ident (itname));
   if (!(itgtkinit = iaca.ia_gtkinititm))
     {
-      iaca.ia_gtkinititm = itgtkinit = iaca_item_make (spf);
+      iaca.ia_gtkinititm = itgtkinit = iaca_item_make (iacafirst_dsp);
       iaca_item_pay_load_make_closure (itgtkinit, &iacacfun_gtkapplinit,
 				       (IacaValue **) 0);
     }
@@ -276,7 +335,7 @@ iacamod_first_init1 (void)
 	iacac_item (iaca_item_pay_load_closure_nth
 		    (itgtkinit, IACAGTKINITVAL_ACTIVEAPPL))))
     {
-      itactivappl = iaca_item_make (spf);
+      itactivappl = iaca_item_make (iacafirst_dsp);
       iaca_item_pay_load_make_closure (itactivappl,
 				       &iacacfun_activateapplication,
 				       (IacaValue **) 0);

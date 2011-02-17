@@ -1201,7 +1201,7 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
       || (dic = itm->v_payloaddict) == NULL)
     return NULL;
   lo = 0;
-  hi = dic->dic_len - 1;
+  hi = (int) dic->dic_len - 1;
   while (lo + 1 < hi)
     {
       IacaString *str = 0;
@@ -1224,6 +1224,7 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
       md = (lo + hi) / 2;
       str = dic->dic_tab[md].de_str;
       g_assert (str != 0);
+      cmp = strcmp (str->v_str, name);
       if (!cmp)
 	return dic->dic_tab[md].de_val;
     }

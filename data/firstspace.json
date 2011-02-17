@@ -4,16 +4,28 @@
  "itemcont": [
   {
    "item": 1,
-   "itemattrs": [],
+   "itemattrs": [
+    {
+     "atid": 4,
+     "val": {
+      "kd": "strv",
+      "str": "the_dictionnary"
+     }
+    }
+   ],
    "itemcontent": null,
    "itempayload": {
     "payloaddictionnary": {
+     "name": {
+      "id": 4,
+      "kd": "itrv"
+     },
      "the_dictionnary": {
       "id": 1,
       "kd": "itrv"
      }
     },
-    "payloaddictlen": 1,
+    "payloaddictlen": 2,
     "payloadkind": "dictionnary"
    }
   },
@@ -41,6 +53,20 @@
     "payloadcloval": [],
     "payloadkind": "closure"
    }
+  },
+  {
+   "item": 4,
+   "itemattrs": [
+    {
+     "atid": 4,
+     "val": {
+      "kd": "strv",
+      "str": "name"
+     }
+    }
+   ],
+   "itemcontent": null,
+   "itempayload": null
   }
  ]
 }
