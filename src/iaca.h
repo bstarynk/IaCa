@@ -108,10 +108,10 @@ enum iacavaluekind_en
 {
   IACAV__NONE = 0,		/* zero, never used */
 
-  IACAV_INTEGER,		/* boxed integer value */
-  IACAV_STRING,			/* UTF8 string value */
-  IACAV_NODE,			/* immutable node value */
-  IACAV_SET,			/* immutable dichotomized set of items */
+  IACAV_INTEGER,		/* boxed immutable integer value */
+  IACAV_STRING,			/* UTF8 immutable string value */
+  IACAV_NODE,			/* immutable copiable node value */
+  IACAV_SET,			/* immutable copiable dichotomized set of items */
   IACAV_ITEM,			/* [shared mutable] item with payload */
   IACAV_GOBJECT,		/* transient Gobject box with value */
 };
@@ -838,6 +838,10 @@ iaca_item_pay_load_closure_set_nth (IacaItem *itm, int rk, IacaValue *val)
   if (rk >= 0 && rk < (int) nbv)
     clo->clo_valtab[rk] = val;
 }
+
+////////////////////////////////////////////////////////////////
+/* recursively copy a value (and the sons of nodes) */
+extern IacaValue *iaca_copy (IacaValue *);
 
 ////////////////////////////////////////////////////////////////
 /* the name of tbe IaCa gtk application; should obey to

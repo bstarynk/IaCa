@@ -302,35 +302,13 @@ iacamod_first_init1 (void)
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
-    {
-      iaca.ia_topdictitm = itdict = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_reserve_dictionnary (itdict, 53);
-      iaca_item_pay_load_put_dictionnary_str (itdict, "the_dictionnary",
-					      (IacaValue *) itdict);
-    }
+    iaca_error ("missing top level dictionnary");
   if (!
       (itname =
        iacac_item (iaca_item_pay_load_dictionnary_get (itdict, "name"))))
-    {
-      itname = iaca_item_make (iacafirst_dsp);
-      iaca_debug ("itname %p #%lld", itname,
-		  (long long) iaca_item_ident (itname));
-      iaca_item_pay_load_put_dictionnary_str (itdict, "name",
-					      (IacaValue *) itname);
-      iaca_item_physical_put ((IacaValue *) itdict, (IacaValue *) itname,
-			      iacav_string_make ("the_dictionnary"));
-      iaca_item_physical_put ((IacaValue *) itname, (IacaValue *) itname,
-			      iacav_string_make ("name"));
-    }
-  else
-    iaca_debug ("got itname %p #%lld", itname,
-		(long long) iaca_item_ident (itname));
+    iaca_error ("missing 'name'");
   if (!(itgtkinit = iaca.ia_gtkinititm))
-    {
-      iaca.ia_gtkinititm = itgtkinit = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itgtkinit, &iacacfun_gtkapplinit,
-				       (IacaValue **) 0);
-    }
+    iaca_error ("missing gtkinitializer");
   if (!(itactivappl =
 	iacac_item (iaca_item_pay_load_closure_nth
 		    (itgtkinit, IACAGTKINITVAL_ACTIVEAPPL))))

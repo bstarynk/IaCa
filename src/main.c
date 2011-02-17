@@ -1470,6 +1470,43 @@ iaca_item_pay_load_closure_gobject_do (GObject *gob, IacaItem *cloitm)
   cfun->cfun_gobject_do (gob, cloitm);
 }
 
+
+////////////////////////////////////////////////////////////////
+IacaValue *
+iaca_copy (IacaValue *v)
+{
+  IacaValue *res = 0;
+  if (!v)
+    return NULL;
+  switch (v->v_kind)
+    {
+    case IACAV_INTEGER:
+      return v;
+    case IACAV_STRING:
+      return v;
+    case IACAV_ITEM:
+      return v;
+    case IACAV_GOBJECT:
+      return v;
+    case IACAV_SET:
+      res = iacav_set_make (v, (IacaValue **) 0, 0);
+      return res;
+    case IACAV_NODE:
+      {
+	IacaNode *n = (IacaNode *) v;
+	res = iacav_node_make ((IacaValue *) (n->v_conn),
+			       (IacaValue **) 0, n->v_arity);
+	for (int ix = (int)(n->v_arity) - 1; ix >= 0; ix--)
+	  ((IacaNode *) res)->v_sons[ix] = iaca_copy (n->v_sons[ix]);
+	return res;
+      }
+    default:
+      iaca_error ("unexpected kind %d to copy %p", v->v_kind, v);
+      return NULL;
+    }
+}
+
+////////////////////////////////////////////////////////////////
 static GQueue iaca_queue_xtra_modules = G_QUEUE_INIT;
 
 static gboolean
