@@ -30,8 +30,12 @@ static IacaValue *iacafirst_valnotebook;
 /* the boxed gobject value for the top entry */
 static IacaValue *iacafirst_valentry;
 
-/* the transient item associating edited items to their widget */
+/* the 'name' item */
+static IacaItem *iacafirst_itname;
+
+/* the transient item associating edited items to their boxed widget */
 static IacaItem *iacafirst_assocedititm;
+
 
 /// initialize the application
 enum iacagtkinitval_en
@@ -54,12 +58,12 @@ iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
 		    (gpointer) itactivapp);
 }
 
-IACA_DEFINE_CLOFUN (gtkapplinit,
-		    IACAGTKINITVAL__LAST, gobject_do, iacafirst_gtkinit);
-
 /// activate the application
 enum iacaactivateapplicationval_en
 {
+  /* closure to edit an existing named item. Called with the item. Should
+     return a boxed widget */
+  IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
   IACAACTIVATEAPPLICATIONVAL__LAST
 };
 
@@ -223,19 +227,27 @@ quit_dialog_cb (GtkWidget *w, gpointer ptr)
 
 
 
+IACA_DEFINE_CLOFUN (gtkapplinit,
+		    IACAGTKINITVAL__LAST, gobject_do, iacafirst_gtkinit);
+
 static void
 edit_named_cb (GtkWidget *menu, gpointer data)
 {
   GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
   GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
   GtkWidget *dial = 0;
+  IacaItem *namededitoritm = data;
+  IacaValue *widval = 0;
+  GtkWidget *wid = 0;
   const gchar *txt = 0;
   const gchar *endtxt = 0;
   IacaItem *nameditm = 0;
   bool goodname = 0;
+  int pagenum = -1;
   int resp = 0;
   g_assert (GTK_IS_ENTRY (entry));
   g_assert (GTK_IS_WINDOW (win));
+  g_assert (namededitoritm && namededitoritm->v_kind == IACAV_ITEM);
   txt = gtk_entry_get_text (entry);
   iaca_debug ("txt '%s'", txt);
   if (!g_utf8_validate (txt, -1, &endtxt))
@@ -284,12 +296,62 @@ edit_named_cb (GtkWidget *menu, gpointer data)
       iaca_debug ("resp %d", resp);
       if (resp == GTK_RESPONSE_OK)
 	{
-	  iaca_error ("creation of new item '%s' unimplemented", txt);
+	  nameditm = iaca_item_make (iacafirst_dsp);
+	  iaca_item_physical_put ((IacaValue *) nameditm,
+				  (IacaValue *) iacafirst_itname,
+				  iacav_string_make (txt));
+	  iaca_item_pay_load_put_dictionnary_str
+	    (iaca.ia_topdictitm, txt, (IacaValue *) nameditm);
+	  iaca_debug ("created named '%s' %p #%lld",
+		      txt, nameditm, iaca_item_identll (nameditm));
 	}
+      else
+	nameditm = 0;
       gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+      if (!nameditm)
+	return;
     }
-  iaca_error ("unimplemented");
-}
+  widval =
+    iaca_item_attribute_physical_get ((IacaValue *) iacafirst_assocedititm,
+				      (IacaValue *) nameditm);
+  wid = GTK_WIDGET (iaca_gobject (widval));
+  iaca_debug ("got widval %p wid %p from iacafirst_assocedititm", widval,
+	      wid);
+  if (widval && !wid)
+    {
+      /* the widval was transformed into a set, so remove it */
+      iaca_item_physical_remove ((IacaValue *) iacafirst_assocedititm,
+				 (IacaValue *) nameditm);
+      widval = NULL;
+      wid = NULL;
+    }
+  if (!wid)
+    {
+      /* apply the namededitoritm to the nameditm */
+      iaca_debug
+	("before applying namededitoritm %p #%lld to nameditm %p #%lld",
+	 namededitoritm, iaca_item_identll (namededitoritm), nameditm,
+	 iaca_item_identll (nameditm));
+      widval =
+	iaca_item_pay_load_closure_one_value ((IacaValue *) nameditm,
+					      namededitoritm);
+      wid = GTK_WIDGET (iaca_gobject (widval));
+      iaca_debug ("got widval %p wid %p", widval, wid);
+      if (!wid)
+	return;
+      gtk_widget_show_all (wid);
+      gtk_notebook_append_page
+	(GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)),
+	 wid, gtk_label_new (txt));
+      iaca_item_physical_put ((IacaValue *) iacafirst_assocedititm,
+			      (IacaValue *) nameditm, widval);
+    }
+  pagenum = gtk_notebook_page_num
+    (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), wid);
+  if (pagenum >= 0)
+    gtk_notebook_set_current_page
+      (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), pagenum);
+}				/* end edit_named_cb */
 
 static void
 iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
@@ -313,8 +375,13 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   GtkWidget *label = 0;
   GtkWidget *entry = 0;
   GtkWidget *notebook = 0;
+  IacaItem *namededitoritm = 0;
   iaca_debug ("app %p", app);
   g_assert (GTK_IS_APPLICATION (app));
+  namededitoritm =
+    iacac_item
+    (iaca_item_pay_load_closure_nth (cloitm,
+				     IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR));
   win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
   iacafirst_valwin = iacav_gobject_box (G_OBJECT (win));
   g_signal_connect (win, "destroy", G_CALLBACK (popup_final_dialog),
@@ -351,7 +418,8 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), copymenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), cutmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), pastemenu);
-  g_signal_connect (namedmenu, "activate", G_CALLBACK (edit_named_cb), NULL);
+  g_signal_connect (namedmenu, "activate", G_CALLBACK (edit_named_cb),
+		    namededitoritm);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
   //// create the hbox
   hbox = gtk_hbox_new (FALSE, 4);
@@ -381,6 +449,81 @@ IACA_DEFINE_CLOFUN (activateapplication,
 		    IACAACTIVATEAPPLICATIONVAL__LAST,
 		    gobject_do, iacafirst_activateapplication);
 
+/// activate the application
+enum iacanamededitorval_en
+{
+  /* closure to edit an existing named item. Called with the item. Should
+     return a boxed widget */
+  IACANAMEDEDITOR__LAST
+};
+
+/* should return a boxed widget */
+static IacaValue *
+iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
+{
+  static GtkTextTagTable *tagtable;
+  static GtkTextTag *titletag;
+  static GtkTextTag *idtag;
+  GtkTextBuffer *txbuf = 0;
+  GtkWidget *txview = 0;
+  IacaValue *res = 0;
+  IacaItem *nitm = iacac_item (v1);
+  const char *nam = 0;
+  GtkTextIter endit = { };
+  char cbuf[64];
+  memset (cbuf, 0, sizeof (cbuf));
+  iaca_debug ("start v1 %p nitm#%lld cloitm %p",
+	      v1, iaca_item_identll (nitm), cloitm);
+  nam = iaca_string_val
+    (iaca_item_attribute_physical_get ((IacaValue *) nitm,
+				       (IacaValue *) iacafirst_itname));
+  if (nam
+      && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, nam)
+      != (IacaValue *) nitm)
+    nam = 0;
+  iaca_debug ("nam '%s'", nam);
+  if (!tagtable)
+    {
+      tagtable = gtk_text_tag_table_new ();
+      iaca_debug ("made tagtable %p", tagtable);
+    }
+  if (!titletag)
+    {
+      titletag = gtk_text_tag_new ("title");
+      g_object_set (G_OBJECT (titletag),
+		    "editable", FALSE,
+		    "foreground", "navy",
+		    "scale", PANGO_SCALE_X_LARGE, "font", "Sans Bold", NULL);
+      gtk_text_tag_table_add (tagtable, titletag);
+      iaca_debug ("made titletag %p", titletag);
+    }
+  if (!idtag)
+    {
+      idtag = gtk_text_tag_new ("id");
+      g_object_set (G_OBJECT (idtag),
+		    "editable", FALSE,
+		    "foreground", "blue",
+		    "scale", PANGO_SCALE_LARGE, "font", "Sans Italics", NULL);
+      gtk_text_tag_table_add (tagtable, idtag);
+      iaca_debug ("made titletag %p", idtag);
+    }
+  txbuf = gtk_text_buffer_new (tagtable);
+  iaca_debug ("txbuf %p", txbuf);
+  gtk_text_buffer_get_end_iter (txbuf, &endit);
+  gtk_text_buffer_insert_with_tags (txbuf, &endit, nam, -1, titletag, NULL);
+  snprintf (cbuf, sizeof (cbuf) - 1, " #%lld", iaca_item_identll (nitm));
+  gtk_text_buffer_get_end_iter (txbuf, &endit);
+  gtk_text_buffer_insert_with_tags (txbuf, &endit, cbuf, -1, idtag, NULL);
+  txview = gtk_text_view_new_with_buffer (txbuf);
+#warning perhaps should make the txview inside a scrollable...
+  res = iacav_gobject_box (G_OBJECT (txview));
+  iaca_debug ("txview %p res %p", txview, res);
+  return res;
+}
+
+IACA_DEFINE_CLOFUN (namededitor,
+		    IACANAMEDEDITOR__LAST, one_value, iacafirst_namededitor);
+
 void
 iacamod_first_init1 (void)
 {
@@ -388,6 +531,7 @@ iacamod_first_init1 (void)
   IacaItem *itgtkinit = 0;
   IacaItem *itactivappl = 0;
   IacaItem *itname = 0;
+  IacaItem *itnamededitor = 0;
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
@@ -396,6 +540,7 @@ iacamod_first_init1 (void)
       (itname =
        iacac_item (iaca_item_pay_load_dictionnary_get (itdict, "name"))))
     iaca_error ("missing 'name'");
+  iacafirst_itname = itname;
   if (!(itgtkinit = iaca.ia_gtkinititm))
     iaca_error ("missing gtkinitializer");
   if (!(itactivappl =
@@ -409,5 +554,19 @@ iacamod_first_init1 (void)
       iaca_item_pay_load_closure_set_nth (itgtkinit,
 					  IACAGTKINITVAL_ACTIVEAPPL,
 					  (IacaValue *) itactivappl);
+    }
+  if (!(itnamededitor
+	= iacac_item (iaca_item_pay_load_closure_nth
+		      (itactivappl,
+		       IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR))))
+    {
+      itnamededitor = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_make_closure (itnamededitor,
+				       &iacacfun_namededitor,
+				       (IacaValue **) 0);
+      iaca_item_pay_load_closure_set_nth
+	(itactivappl,
+	 IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
+	 (IacaValue *) itnamededitor);
     }
 }
