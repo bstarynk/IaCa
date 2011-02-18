@@ -615,7 +615,7 @@ iaca_load (const char *dirpath)
 	  iaca_debug ("data '%s'", name);
 	  g_queue_push_tail (dataque, name);
 	}
-      else if (sscanf (line, " IACAVERION %ms", &name) > 0)
+      else if (sscanf (line, " IACAVERSION %ms", &name) > 0)
 	{
 	  iaca_debug ("version '%s'", name);
 	  if (strcmp (name, IACA_JSON_VERSION))
