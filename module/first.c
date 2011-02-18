@@ -58,6 +58,43 @@ iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
 		    (gpointer) itactivapp);
 }
 
+
+/* update the completion of the main entry widget for the toplevel
+   dictionnary; should be called initially and at every change to the
+   toplevel dictionnary */
+static void
+update_completion_entry_topdict (void)
+{
+  GtkEntry *ent = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
+  GtkEntryCompletion *compl = 0;
+  GtkListStore *ls = 0;
+  GtkTreeIter iter = { };
+  int cnt = 0;
+  iaca_debug ("ent %p", ent);
+  g_assert (GTK_IS_ENTRY (ent));
+  compl = gtk_entry_get_completion (ent);
+  if (!compl)
+    {
+      compl = gtk_entry_completion_new ();
+      gtk_entry_set_completion (ent, compl);
+      g_object_unref (compl);
+    }
+  ls = gtk_list_store_new (1, G_TYPE_STRING);
+  IACA_FOREACH_DICTIONNARY_STRING_LOCAL (iaca.ia_topdictitm, strv)
+  {
+    gtk_list_store_append (ls, &iter);
+    gtk_list_store_set (ls, &iter, 0, iaca_string_val ((IacaValue*)strv), -1);
+    cnt++;
+  }
+  gtk_entry_completion_set_model (compl, GTK_TREE_MODEL (ls));
+  g_object_unref (ls);
+  gtk_entry_completion_set_text_column (compl, 0);
+  if (cnt > 33)
+    gtk_entry_completion_set_minimum_key_length (compl, 3);
+  else if (cnt > 5)
+    gtk_entry_completion_set_minimum_key_length (compl, 2);
+}
+
 /// activate the application
 enum iacaactivateapplicationval_en
 {
@@ -304,6 +341,7 @@ edit_named_cb (GtkWidget *menu, gpointer data)
 	    (iaca.ia_topdictitm, txt, (IacaValue *) nameditm);
 	  iaca_debug ("created named '%s' %p #%lld",
 		      txt, nameditm, iaca_item_identll (nameditm));
+	  update_completion_entry_topdict ();
 	}
       else
 	nameditm = 0;
@@ -434,6 +472,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
     entry = gtk_entry_new ();
     iacafirst_valentry = iacav_gobject_box (G_OBJECT (entry));
     gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
+    update_completion_entry_topdict ();
   }
   //// create the notebook and the association of edited items
   notebook = gtk_notebook_new ();
@@ -462,11 +501,11 @@ static IacaValue *
 iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 {
   static GtkTextTagTable *tagtable;
-  static GtkTextTag *titletag;
-  static GtkTextTag *idtag;
   GtkTextBuffer *txbuf = 0;
   GtkWidget *txview = 0;
+  GtkWidget *scrwin = 0;
   IacaValue *res = 0;
+  IacaValue *valtxbuf = 0;
   IacaItem *nitm = iacac_item (v1);
   const char *nam = 0;
   GtkTextIter endit = { };
@@ -484,40 +523,47 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   iaca_debug ("nam '%s'", nam);
   if (!tagtable)
     {
+      GtkTextTag *tag = 0;
       tagtable = gtk_text_tag_table_new ();
       iaca_debug ("made tagtable %p", tagtable);
-    }
-  if (!titletag)
-    {
-      titletag = gtk_text_tag_new ("title");
-      g_object_set (G_OBJECT (titletag),
+      tag = gtk_text_tag_new ("title");
+      g_object_set (G_OBJECT (tag),
 		    "editable", FALSE,
 		    "foreground", "navy",
-		    "scale", PANGO_SCALE_X_LARGE, "font", "Sans Bold", NULL);
-      gtk_text_tag_table_add (tagtable, titletag);
-      iaca_debug ("made titletag %p", titletag);
-    }
-  if (!idtag)
-    {
-      idtag = gtk_text_tag_new ("id");
-      g_object_set (G_OBJECT (idtag),
-		    "editable", FALSE,
+		    "background", "ivory",
+		    "scale", PANGO_SCALE_X_LARGE,
+		    "family", "Verdana",
+		    "justification", GTK_JUSTIFY_CENTER,
+		    "weight", PANGO_WEIGHT_BOLD, NULL);
+      gtk_text_tag_table_add (tagtable, tag);
+      iaca_debug ("made title tag %p", tag);
+      tag = gtk_text_tag_new ("id");
+      g_object_set (G_OBJECT (tag),
 		    "foreground", "blue",
-		    "scale", PANGO_SCALE_LARGE, "font", "Sans Italics", NULL);
-      gtk_text_tag_table_add (tagtable, idtag);
-      iaca_debug ("made titletag %p", idtag);
-    }
+		    "scale", PANGO_SCALE_SMALL,
+		    "style", PANGO_STYLE_ITALIC, NULL);
+      gtk_text_tag_table_add (tagtable, tag);
+      iaca_debug ("made id tag %p", tag);
+    };
   txbuf = gtk_text_buffer_new (tagtable);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
-  gtk_text_buffer_insert_with_tags (txbuf, &endit, nam, -1, titletag, NULL);
+  gtk_text_buffer_insert_with_tags_by_name
+    (txbuf, &endit, nam, -1, "title", NULL);
   snprintf (cbuf, sizeof (cbuf) - 1, " #%lld", iaca_item_identll (nitm));
   gtk_text_buffer_get_end_iter (txbuf, &endit);
-  gtk_text_buffer_insert_with_tags (txbuf, &endit, cbuf, -1, idtag, NULL);
+  gtk_text_buffer_insert_with_tags_by_name
+    (txbuf, &endit, cbuf, -1, "title", "id", NULL);
   txview = gtk_text_view_new_with_buffer (txbuf);
-#warning perhaps should make the txview inside a scrollable...
-  res = iacav_gobject_box (G_OBJECT (txview));
-  iaca_debug ("txview %p res %p", txview, res);
+  gtk_text_view_set_editable (GTK_TEXT_VIEW (txview), FALSE);
+  scrwin = gtk_scrolled_window_new (NULL, NULL);
+  gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrwin),
+				  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_container_add (GTK_CONTAINER (scrwin), txview);
+  res = iacav_gobject_box (G_OBJECT (scrwin));
+  valtxbuf = iacav_gobject_box (G_OBJECT (txbuf));
+  iaca_gobject_put_data (res, valtxbuf);
+  iaca_debug ("scrwin %p txview %p res %p", scrwin, txview, res);
   return res;
 }
 

@@ -3,31 +3,6 @@
  "iacaversion": "2011A",
  "itemcont": [
   {
-   "item": 3,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "activateapplication",
-    "payloadcloval": [
-     {
-      "id": 5,
-      "kd": "itrv"
-     }
-    ],
-    "payloadkind": "closure"
-   }
-  },
-  {
-   "item": 5,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "namededitor",
-    "payloadcloval": [],
-    "payloadkind": "closure"
-   }
-  },
-  {
    "item": 1,
    "itemattrs": [
     {
@@ -80,6 +55,31 @@
       "kd": "itrv"
      }
     ],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 3,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "activateapplication",
+    "payloadcloval": [
+     {
+      "id": 5,
+      "kd": "itrv"
+     }
+    ],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 5,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "namededitor",
+    "payloadcloval": [],
     "payloadkind": "closure"
    }
   }

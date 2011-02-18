@@ -615,6 +615,14 @@ iaca_load (const char *dirpath)
 	  iaca_debug ("data '%s'", name);
 	  g_queue_push_tail (dataque, name);
 	}
+      else if (sscanf (line, " IACAVERION %ms", &name) > 0)
+	{
+	  iaca_debug ("version '%s'", name);
+	  if (strcmp (name, IACA_JSON_VERSION))
+	    iaca_error ("got version %s but expecting %s",
+			name, IACA_JSON_VERSION);
+	  free (name), name = 0;
+	}
 #define LOAD_SCAN_TOP_ITEM(Fld,Str)				\
       else if (sscanf (line, " " Str " %lld", &Fld##_num) > 0)	\
       {								\
@@ -1205,7 +1213,9 @@ iaca_dump (const char *dirpath)
   dum.du_manifile = fopen (tmpmanifestpath, "w");
   if (!dum.du_manifile)
     iaca_error ("failed to open manifest %s - %m", tmpmanifestpath);
-  fprintf (dum.du_manifile, "# file %s generated %s\n", manifestpath, nowbuf);
+  fprintf (dum.du_manifile, "# file %s generated %s\n", IACA_MANIFEST_FILE,
+	   nowbuf);
+  fprintf (dum.du_manifile, "IACAVERSION %s\n", IACA_JSON_VERSION);
   dum.du_magic = IACA_DUMPER_MAGIC;
   dum.du_dirname = dirpath;
   dum.du_scanqueue = g_queue_new ();

@@ -662,9 +662,21 @@ static inline unsigned iaca_item_pay_load_buffer_length (IacaItem *itm);
 extern void iaca_item_pay_load_reserve_dictionnary (IacaItem *itm,
 						    unsigned sz);
 
-static inline IacaValue *iaca_item_pay_load_dictionnary_get (IacaItem *itm,
-							     const char
-							     *name);
+static inline IacaValue *iaca_item_pay_load_dictionnary_get
+  (IacaItem *itm, const char *name);
+
+static inline IacaString *iaca_item_pay_load_dictionnary_next_string
+  (IacaItem *itm, const char *name);
+
+#define IACA_FOREACH_DICTIONNARY_STRING_LOCAL(Itdic,Strvar)	\
+  for (IacaString* Strvar =					\
+       iaca_item_pay_load_dictionnary_next_string		\
+       (Itdic, NULL);						\
+     Strvar != NULL;						\
+     Strvar =							\
+       iaca_item_pay_load_dictionnary_next_string		\
+       (Itdic,							\
+	iaca_string_val((IacaValue*)(Strvar))))
 
 extern void
 iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
@@ -1232,6 +1244,62 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
       cmp = strcmp (str->v_str, name);
       if (!cmp)
 	return dic->dic_tab[md].de_val;
+    }
+  return NULL;
+}
+
+static inline IacaString *
+iaca_item_pay_load_dictionnary_next_string (IacaItem *itm, const char *name)
+{
+  int lo = 0, hi = 0, md = 0, ln = 0;
+  struct iacapayloaddictionnary_st *dic = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM
+      || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY
+      || (dic = itm->v_payloaddict) == NULL)
+    return NULL;
+  lo = 0;
+  ln = (int) dic->dic_len;
+  hi = ln - 1;
+  if (!name || !name[0])
+    {
+      if (hi >= 0)
+	return dic->dic_tab[0].de_str;
+      return NULL;
+    }
+  while (lo + 1 < hi)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      md = (lo + hi) / 2;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0 && str->v_kind == IACAV_STRING);
+      cmp = strcmp (str->v_str, name);
+      if (!cmp)
+	{
+	  if (md + 1 < ln)
+	    return dic->dic_tab[md + 1].de_str;
+	  else
+	    return NULL;
+	}
+      if (cmp < 0)
+	hi = md;
+      else
+	lo = md;
+    };
+  for (md = lo; md <= hi; md++)
+    {
+      IacaString *str = 0;
+      int cmp = 0;
+      str = dic->dic_tab[md].de_str;
+      g_assert (str != 0);
+      cmp = strcmp (str->v_str, name);
+      if (!cmp)
+	{
+	  if (md + 1 < ln)
+	    return dic->dic_tab[md + 1].de_str;
+	  else
+	    return NULL;
+	}
     }
   return NULL;
 }
