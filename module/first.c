@@ -83,7 +83,8 @@ update_completion_entry_topdict (void)
   IACA_FOREACH_DICTIONNARY_STRING_LOCAL (iaca.ia_topdictitm, strv)
   {
     gtk_list_store_append (ls, &iter);
-    gtk_list_store_set (ls, &iter, 0, iaca_string_val ((IacaValue*)strv), -1);
+    gtk_list_store_set (ls, &iter, 0, iaca_string_val ((IacaValue *) strv),
+			-1);
     cnt++;
   }
   gtk_entry_completion_set_model (compl, GTK_TREE_MODEL (ls));
@@ -391,6 +392,8 @@ edit_named_cb (GtkWidget *menu, gpointer data)
       (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), pagenum);
 }				/* end edit_named_cb */
 
+
+
 static void
 iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
 {
@@ -488,19 +491,35 @@ IACA_DEFINE_CLOFUN (activateapplication,
 		    IACAACTIVATEAPPLICATIONVAL__LAST,
 		    gobject_do, iacafirst_activateapplication);
 
-/// activate the application
+/// closed values for named editor
 enum iacanamededitorval_en
 {
-  /* closure to edit an existing named item. Called with the item. Should
-     return a boxed widget */
   IACANAMEDEDITOR__LAST
 };
+
+static gboolean
+motion_namededitor_view (GtkWidget *widg, GdkEventMotion * ev, gpointer data)
+{
+  gint bufx = 0, bufy = 0;
+  int lin = 0, col = 0;
+  GtkTextIter herit = { };
+  g_assert (GTK_IS_TEXT_VIEW (widg));
+  gtk_text_view_window_to_buffer_coords
+    (GTK_TEXT_VIEW (widg),
+     GTK_TEXT_WINDOW_WIDGET, (gint) ev->x, (gint) ev->y, &bufx, &bufy);
+  gtk_text_view_get_iter_at_position (GTK_TEXT_VIEW (widg),
+				      &herit, NULL, bufx, bufy);
+  lin = gtk_text_iter_get_line (&herit);
+  col = gtk_text_iter_get_line_offset (&herit);
+  iaca_debug ("bufx %d bufy %d lin %d col %d", bufx, bufy, lin, col);
+  /* return true to stop other handlers */
+  return FALSE;
+}
 
 /* should return a boxed widget */
 static IacaValue *
 iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 {
-  static GtkTextTagTable *tagtable;
   GtkTextBuffer *txbuf = 0;
   GtkWidget *txview = 0;
   GtkWidget *scrwin = 0;
@@ -521,31 +540,19 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
       != (IacaValue *) nitm)
     nam = 0;
   iaca_debug ("nam '%s'", nam);
-  if (!tagtable)
-    {
-      GtkTextTag *tag = 0;
-      tagtable = gtk_text_tag_table_new ();
-      iaca_debug ("made tagtable %p", tagtable);
-      tag = gtk_text_tag_new ("title");
-      g_object_set (G_OBJECT (tag),
-		    "editable", FALSE,
-		    "foreground", "navy",
-		    "background", "ivory",
-		    "scale", PANGO_SCALE_X_LARGE,
-		    "family", "Verdana",
-		    "justification", GTK_JUSTIFY_CENTER,
-		    "weight", PANGO_WEIGHT_BOLD, NULL);
-      gtk_text_tag_table_add (tagtable, tag);
-      iaca_debug ("made title tag %p", tag);
-      tag = gtk_text_tag_new ("id");
-      g_object_set (G_OBJECT (tag),
-		    "foreground", "blue",
-		    "scale", PANGO_SCALE_SMALL,
-		    "style", PANGO_STYLE_ITALIC, NULL);
-      gtk_text_tag_table_add (tagtable, tag);
-      iaca_debug ("made id tag %p", tag);
-    };
-  txbuf = gtk_text_buffer_new (tagtable);
+  txbuf = gtk_text_buffer_new (NULL);
+  gtk_text_buffer_create_tag (txbuf, "title",
+			      "editable", FALSE,
+			      "foreground", "navy",
+			      "background", "ivory",
+			      "scale", PANGO_SCALE_X_LARGE,
+			      "family", "Verdana",
+			      "justification", GTK_JUSTIFY_CENTER,
+			      "weight", PANGO_WEIGHT_BOLD, NULL);
+  gtk_text_buffer_create_tag (txbuf, "id",
+			      "foreground", "blue",
+			      "scale", PANGO_SCALE_SMALL,
+			      "style", PANGO_STYLE_ITALIC, NULL);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
   gtk_text_buffer_insert_with_tags_by_name
@@ -562,6 +569,8 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   gtk_container_add (GTK_CONTAINER (scrwin), txview);
   res = iacav_gobject_box (G_OBJECT (scrwin));
   valtxbuf = iacav_gobject_box (G_OBJECT (txbuf));
+  g_signal_connect (G_OBJECT (txview), "motion-notify-event",
+		    G_CALLBACK (motion_namededitor_view), valtxbuf);
   iaca_gobject_put_data (res, valtxbuf);
   iaca_debug ("scrwin %p txview %p res %p", scrwin, txview, res);
   return res;
@@ -592,27 +601,10 @@ iacamod_first_init1 (void)
   if (!(itactivappl =
 	iacac_item (iaca_item_pay_load_closure_nth
 		    (itgtkinit, IACAGTKINITVAL_ACTIVEAPPL))))
-    {
-      itactivappl = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itactivappl,
-				       &iacacfun_activateapplication,
-				       (IacaValue **) 0);
-      iaca_item_pay_load_closure_set_nth (itgtkinit,
-					  IACAGTKINITVAL_ACTIVEAPPL,
-					  (IacaValue *) itactivappl);
-    }
+    iaca_error ("missing activeappl");
   if (!(itnamededitor
 	= iacac_item (iaca_item_pay_load_closure_nth
 		      (itactivappl,
 		       IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR))))
-    {
-      itnamededitor = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itnamededitor,
-				       &iacacfun_namededitor,
-				       (IacaValue **) 0);
-      iaca_item_pay_load_closure_set_nth
-	(itactivappl,
-	 IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
-	 (IacaValue *) itnamededitor);
-    }
+    iaca_error ("missing namededitor");
 }
