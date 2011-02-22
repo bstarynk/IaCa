@@ -595,11 +595,81 @@ enum iacadisplayitemval_en
   IACADISPLAYITEM__LAST
 };
 
-/* display an item, returned value is ignored, v1 is the boxed text
-   buffer v2 is the item to display */
+static int
+display_item_cmp (const void *p1, const void *p2)
+{
+  IacaItem *i1 = *(IacaItem **) p1;
+  IacaItem *i2 = *(IacaItem **) p2;
+  const char *n1 = 0;
+  const char *n2 = 0;
+  if (i1 == i2)
+    return 0;
+  n1 = iaca_string_val
+    (iaca_item_attribute_physical_get ((IacaValue *) i1,
+				       (IacaValue *) iacafirst_itname));
+  if (n1
+      && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, n1)
+      != (IacaValue *) i1)
+    n1 = NULL;
+  n2 = iaca_string_val
+    (iaca_item_attribute_physical_get ((IacaValue *) i2,
+				       (IacaValue *) iacafirst_itname));
+  if (n2
+      && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, n2)
+      != (IacaValue *) i2)
+    n2 = NULL;
+  if (!n1 && !n2)
+    {
+      if (i1->v_ident < i2->v_ident)
+	return -1;
+      else if (i1->v_ident > i2->v_ident)
+	return 1;
+    }
+  return g_strcmp0 (n1, n2);
+}
+
+/* display an item, returned value is ignored, v1 is the boxed gtk
+   text buffer v2 is the item to display */
 static IacaValue *
 iacafirst_displayitem (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
 {
+  GtkTextBuffer *txbuf = 0;
+  IacaItem *itd = iacac_item (v2);
+  IacaItem **attrs = 0;
+  int nbattrs = 0;
+  int atcnt = 0;
+  g_assert (GTK_IS_TEXT_BUFFER (iaca_gobject (v1)));
+  txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1));
+  g_assert (itd != NULL);
+  nbattrs = iaca_item_number_attributes ((IacaValue *) itd);
+  if (nbattrs > 0)
+    attrs = iaca_alloc_data (sizeof (IacaItem *) * (nbattrs + 1));
+  /* first, get the attributes and sort them. For named attributes,
+     the sorting is alphanumeric. */
+  memset (attrs, 0, sizeof (IacaItem *) * nbattrs);
+  atcnt = 0;
+  IACA_FOREACH_ITEM_ATTRIBUTE_LOCAL ((IacaValue *) itd, vat)
+  {
+    IacaItem *curat = iacac_item (vat);
+    char *namat = 0;
+    if (!curat)
+      continue;
+    if (atcnt >= nbattrs)
+      break;
+    attrs[atcnt++] = curat;
+  }
+  qsort (attrs, atcnt, sizeof (IacaItem *), display_item_cmp);
+  for (int ix = 0; ix < atcnt; ix++)
+    {
+      IacaItem *curat = attrs[ix];
+      IacaValue *curval = 0;
+      if (!curat)
+	continue;
+      curval = iaca_item_attribute_physical_get ((IacaValue *) itd,
+						 (IacaValue *) curat);
+      if (!curval)
+	continue;
+    }
   iaca_error ("iacafirst_displayitem unimplemented");
 #warning iacafirst_displayitem unimplemented
   return NULL;
