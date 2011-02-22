@@ -494,6 +494,7 @@ IACA_DEFINE_CLOFUN (activateapplication,
 /// closed values for named editor
 enum iacanamededitorval_en
 {
+  IACANAMEDEDITOR_DISPLAYITEM,
   IACANAMEDEDITOR__LAST
 };
 
@@ -525,6 +526,7 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   GtkWidget *scrwin = 0;
   IacaValue *res = 0;
   IacaValue *valtxbuf = 0;
+  IacaItem *itdisplitem = 0;
   IacaItem *nitm = iacac_item (v1);
   const char *nam = 0;
   GtkTextIter endit = { };
@@ -573,11 +575,42 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 		    G_CALLBACK (motion_namededitor_view), valtxbuf);
   iaca_gobject_put_data (res, valtxbuf);
   iaca_debug ("scrwin %p txview %p res %p", scrwin, txview, res);
+  itdisplitem =
+    iacac_item (iaca_item_pay_load_closure_nth (cloitm,
+						IACANAMEDEDITOR_DISPLAYITEM));
+  if (itdisplitem)
+    iaca_item_pay_load_closure_two_values (valtxbuf, (IacaValue *) nitm,
+					   itdisplitem);
+
   return res;
 }
 
 IACA_DEFINE_CLOFUN (namededitor,
 		    IACANAMEDEDITOR__LAST, one_value, iacafirst_namededitor);
+
+////////////////////////////////////////////////////////////////
+/// closed values for displayitem
+enum iacadisplayitemval_en
+{
+  IACADISPLAYITEM__LAST
+};
+
+/* display an item, returned value is ignored, v1 is the boxed text
+   buffer v2 is the item to display */
+static IacaValue *
+iacafirst_displayitem (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
+{
+  iaca_error ("iacafirst_displayitem unimplemented");
+#warning iacafirst_displayitem unimplemented
+  return NULL;
+}
+
+IACA_DEFINE_CLOFUN (displayitem,
+		    IACADISPLAYITEM__LAST, two_values, iacafirst_displayitem);
+
+
+////////////////////////////////////////////////////////////////
+
 
 void
 iacamod_first_init1 (void)
@@ -587,6 +620,7 @@ iacamod_first_init1 (void)
   IacaItem *itactivappl = 0;
   IacaItem *itname = 0;
   IacaItem *itnamededitor = 0;
+  IacaItem *itdisplitem = 0;
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
@@ -607,4 +641,16 @@ iacamod_first_init1 (void)
 		      (itactivappl,
 		       IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR))))
     iaca_error ("missing namededitor");
+  if (!(itdisplitem
+	= iacac_item (iaca_item_pay_load_closure_nth
+		      (itnamededitor, IACANAMEDEDITOR_DISPLAYITEM))))
+    {
+      itdisplitem = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_make_closure (itdisplitem,
+				       &iacacfun_displayitem,
+				       (IacaValue **) 0);
+      iaca_item_pay_load_closure_set_nth
+	(itnamededitor,
+	 IACANAMEDEDITOR_DISPLAYITEM, (IacaValue *) itdisplitem);
+    }
 }

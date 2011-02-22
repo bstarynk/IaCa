@@ -3,20 +3,6 @@
  "iacaversion": "2011A",
  "itemcont": [
   {
-   "item": 4,
-   "itemattrs": [
-    {
-     "atid": 4,
-     "val": {
-      "kd": "strv",
-      "str": "name"
-     }
-    }
-   ],
-   "itemcontent": null,
-   "itempayload": null
-  },
-  {
    "item": 2,
    "itemattrs": [],
    "itemcontent": null,
@@ -52,7 +38,12 @@
    "itemcontent": null,
    "itempayload": {
     "payloadclofun": "namededitor",
-    "payloadcloval": [],
+    "payloadcloval": [
+     {
+      "id": 6,
+      "kd": "itrv"
+     }
+    ],
     "payloadkind": "closure"
    }
   },
@@ -82,6 +73,30 @@
     "payloaddictlen": 2,
     "payloadkind": "dictionnary"
    }
+  },
+  {
+   "item": 6,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "displayitem",
+    "payloadcloval": [],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 4,
+   "itemattrs": [
+    {
+     "atid": 4,
+     "val": {
+      "kd": "strv",
+      "str": "name"
+     }
+    }
+   ],
+   "itemcontent": null,
+   "itempayload": null
   }
  ]
 }
