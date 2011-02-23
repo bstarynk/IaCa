@@ -70,6 +70,8 @@ struct iacadumper_st
   IacaItem *du_curitem;
   /* the currently dumped space */
   struct iacadataspace_st *du_dspace;
+  /* the array of dumped items */
+  GPtrArray *du_itarr;
   /* the currently json array */
   json_t *du_jsarr;
   /* the manifest file */
@@ -1134,17 +1136,25 @@ iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
   return js;
 }
 
+static void
+itarr_dump (IacaItem *itm, struct iacadumper_st *du)
+{
+  json_t *jsit = 0;
+  g_assert (du && du->du_magic == IACA_DUMPER_MAGIC);
+  g_assert (itm && itm->v_kind == IACAV_ITEM);
+  jsit = iaca_dump_item_content_json (du, itm);
+  json_array_append_new (du->du_jsarr, jsit);
+}
+
 static gboolean
 iaca_dump_space_traversal (gpointer key, gpointer value, gpointer data)
 {
   struct iacadumper_st *du = (struct iacadumper_st *) data;
   IacaItem *itm = (IacaItem *) key;
-  json_t *jsit = 0;
   g_assert (du && du->du_magic == IACA_DUMPER_MAGIC);
   g_assert (itm && itm->v_kind == IACAV_ITEM && (gpointer) itm == value);
   g_assert (json_is_array (du->du_jsarr));
-  jsit = iaca_dump_item_content_json (du, itm);
-  json_array_append_new (du->du_jsarr, jsit);
+  g_ptr_array_add (du->du_itarr, itm);
   return FALSE;			/* to continue the traversal */
 }
 
@@ -1170,6 +1180,28 @@ iaca_dump_module_traversal (gpointer key, gpointer value, gpointer data)
 		  (long long) iaca.ia_moduledumpitm->v_ident, modname);
     }
   return FALSE;			/* to continue the traversal */
+}
+
+/* the item comparison function for g_ptr_array_sort() doesn't take the
+   pointers from the array as arguments, it takes pointers to the
+   pointers in the array. */
+static int
+sort_itarr_cmp (gconstpointer p1, gconstpointer p2)
+{
+  IacaItem *it1 = *(IacaItem **) p1;
+  IacaItem *it2 = *(IacaItem **) p2;
+  g_assert (it1 && it1->v_kind == IACAV_ITEM);
+  g_assert (it2 && it2->v_kind == IACAV_ITEM);
+  if (it1 == it2)
+    return 0;
+  if (it1->v_ident < it2->v_ident)
+    return -1;
+  else if (it1->v_ident > it2->v_ident)
+    return 1;
+  else
+    iaca_error ("corrupted item array it1 %p #%lld it2 %p #%lld",
+		it1, iaca_item_identll (it1), it2, iaca_item_identll (it2));
+  return 2;
 }
 
 void
@@ -1225,21 +1257,20 @@ iaca_dump (const char *dirpath)
   // the top dictionnary
   iaca_debug ("topdictitm %p #%lld",
 	      iaca.ia_topdictitm,
-	      (long long) (iaca.ia_topdictitm ? iaca.
-			   ia_topdictitm->v_ident : 0LL));
+	      (long long) (iaca.ia_topdictitm ? iaca.ia_topdictitm->
+			   v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_topdictitm);
   // the data space hook
   iaca_debug ("dataspacehookitm %p #%lld",
 	      iaca.ia_dataspacehookitm,
-	      (long long) (iaca.
-			   ia_dataspacehookitm ? iaca.ia_dataspacehookitm->
-			   v_ident : 0LL));
+	      (long long) (iaca.ia_dataspacehookitm ? iaca.
+			   ia_dataspacehookitm->v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_dataspacehookitm);
   // the gtk initializer
   iaca_debug ("gtkinititm %p #%lld",
 	      iaca.ia_gtkinititm,
-	      (long long) (iaca.ia_gtkinititm ? iaca.
-			   ia_gtkinititm->v_ident : 0LL));
+	      (long long) (iaca.ia_gtkinititm ? iaca.ia_gtkinititm->
+			   v_ident : 0LL));
   (void) iaca_dump_queue_item (&dum, iaca.ia_gtkinititm);
   /* initialize the module tree */
   dum.du_moduletree = g_tree_new ((GCompareFunc) g_strcmp0);
@@ -1287,7 +1318,11 @@ iaca_dump (const char *dirpath)
       spacename = iaca_string_val ((IacaValue *) (dspace->dsp_name));
       dum.du_dspace = dspace;
       dum.du_jsarr = jsarr;
+      dum.du_itarr = g_ptr_array_sized_new (g_tree_nnodes (curtree));
       g_tree_foreach (curtree, iaca_dump_space_traversal, &dum);
+      g_ptr_array_sort (dum.du_itarr, sort_itarr_cmp);
+      g_ptr_array_foreach (dum.du_itarr, (GFunc) itarr_dump, &dum);
+      g_ptr_array_free (dum.du_itarr, TRUE), dum.du_itarr = 0;
       json_object_set (js, "iacaversion", json_string (IACA_JSON_VERSION));
       json_object_set (js, "iacaspace", json_string (spacename));
       json_object_set (js, "itemcont", jsarr);

@@ -494,7 +494,7 @@ IACA_DEFINE_CLOFUN (activateapplication,
 /// closed values for named editor
 enum iacanamededitorval_en
 {
-  IACANAMEDEDITOR_DISPLAYITEM,
+  IACANAMEDEDITOR_DISPLAYITEMCONTENT,
   IACANAMEDEDITOR__LAST
 };
 
@@ -577,7 +577,7 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   iaca_debug ("scrwin %p txview %p res %p", scrwin, txview, res);
   itdisplitem =
     iacac_item (iaca_item_pay_load_closure_nth (cloitm,
-						IACANAMEDEDITOR_DISPLAYITEM));
+						IACANAMEDEDITOR_DISPLAYITEMCONTENT));
   if (itdisplitem)
     iaca_item_pay_load_closure_two_values (valtxbuf, (IacaValue *) nitm,
 					   itdisplitem);
@@ -589,10 +589,10 @@ IACA_DEFINE_CLOFUN (namededitor,
 		    IACANAMEDEDITOR__LAST, one_value, iacafirst_namededitor);
 
 ////////////////////////////////////////////////////////////////
-/// closed values for displayitem
-enum iacadisplayitemval_en
+/// closed values for displayitemcontent
+enum iacadisplayitemcontentval_en
 {
-  IACADISPLAYITEM__LAST
+  IACADISPLAYITEMCONTENT__LAST
 };
 
 static int
@@ -631,7 +631,7 @@ display_item_cmp (const void *p1, const void *p2)
 /* display an item, returned value is ignored, v1 is the boxed gtk
    text buffer v2 is the item to display */
 static IacaValue *
-iacafirst_displayitem (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
+iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
 {
   GtkTextBuffer *txbuf = 0;
   IacaItem *itd = iacac_item (v2);
@@ -670,13 +670,14 @@ iacafirst_displayitem (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
       if (!curval)
 	continue;
     }
-  iaca_error ("iacafirst_displayitem unimplemented");
-#warning iacafirst_displayitem unimplemented
+  iaca_error ("iacafirst_displayitemcontent unimplemented");
+#warning iacafirst_displayitemcontent unimplemented
   return NULL;
 }
 
-IACA_DEFINE_CLOFUN (displayitem,
-		    IACADISPLAYITEM__LAST, two_values, iacafirst_displayitem);
+IACA_DEFINE_CLOFUN (displayitemcontent,
+		    IACADISPLAYITEMCONTENT__LAST, two_values,
+		    iacafirst_displayitemcontent);
 
 
 ////////////////////////////////////////////////////////////////
@@ -713,14 +714,14 @@ iacamod_first_init1 (void)
     iaca_error ("missing namededitor");
   if (!(itdisplitem
 	= iacac_item (iaca_item_pay_load_closure_nth
-		      (itnamededitor, IACANAMEDEDITOR_DISPLAYITEM))))
+		      (itnamededitor, IACANAMEDEDITOR_DISPLAYITEMCONTENT))))
     {
       itdisplitem = iaca_item_make (iacafirst_dsp);
       iaca_item_pay_load_make_closure (itdisplitem,
-				       &iacacfun_displayitem,
+				       &iacacfun_displayitemcontent,
 				       (IacaValue **) 0);
       iaca_item_pay_load_closure_set_nth
 	(itnamededitor,
-	 IACANAMEDEDITOR_DISPLAYITEM, (IacaValue *) itdisplitem);
+	 IACANAMEDEDITOR_DISPLAYITEMCONTENT, (IacaValue *) itdisplitem);
     }
 }
