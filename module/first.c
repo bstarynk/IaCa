@@ -628,12 +628,28 @@ display_item_cmp (const void *p1, const void *p2)
   return g_strcmp0 (n1, n2);
 }
 
+static void
+insert_item_txbuf (GtkTextBuffer *txbuf, GtkTextIter * it, IacaItem *itm)
+{
+  const char *nam = 0;
+  g_assert (GTK_IS_TEXT_BUFFER (txbuf));
+  g_assert (it != NULL);
+  g_assert (itm != NULL && itm->v_kind == IACAV_ITEM);
+  nam = iaca_string_val
+    (iaca_item_attribute_physical_get ((IacaValue *) itm,
+				       (IacaValue *) iacafirst_itname));
+  if (nam)
+    gtk_text_buffer_insert_with_tags_by_name (txbuf, it, nam, -1, NULL);
+#warning insert_item_txbuf very incomplete
+}
+
 /* display an item, returned value is ignored, v1 is the boxed gtk
    text buffer v2 is the item to display */
 static IacaValue *
 iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
 {
   GtkTextBuffer *txbuf = 0;
+  GtkTextIter endit = { };
   IacaItem *itd = iacac_item (v2);
   IacaItem **attrs = 0;
   int nbattrs = 0;
@@ -651,7 +667,6 @@ iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
   IACA_FOREACH_ITEM_ATTRIBUTE_LOCAL ((IacaValue *) itd, vat)
   {
     IacaItem *curat = iacac_item (vat);
-    char *namat = 0;
     if (!curat)
       continue;
     if (atcnt >= nbattrs)
@@ -669,6 +684,13 @@ iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
 						 (IacaValue *) curat);
       if (!curval)
 	continue;
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+      gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+#define BEGIN_ATTR_DECOR " \342\227\246"	/* ◦ U+25E6 WHITE BULLET */
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, BEGIN_ATTR_DECOR, -1, NULL);
+      insert_item_txbuf (txbuf, &endit, curat);
+      /* should insert the decoration for curval, and curval itself */
     }
   iaca_error ("iacafirst_displayitemcontent unimplemented");
 #warning iacafirst_displayitemcontent unimplemented
