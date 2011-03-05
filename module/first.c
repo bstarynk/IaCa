@@ -555,6 +555,7 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 			      "foreground", "blue",
 			      "scale", PANGO_SCALE_SMALL,
 			      "style", PANGO_STYLE_ITALIC, NULL);
+  gtk_text_buffer_create_tag (txbuf, "item", "background", "orange", NULL);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
   gtk_text_buffer_insert_with_tags_by_name
@@ -625,21 +626,34 @@ display_item_cmp (const void *p1, const void *p2)
       else if (i1->v_ident > i2->v_ident)
 	return 1;
     }
+  if (n1 && !n2)
+    return -1;
+  if (!n1 && n2)
+    return 1;
   return g_strcmp0 (n1, n2);
 }
 
+#warning we really should have a tree [ie node] representation of every item!
 static void
-insert_item_txbuf (GtkTextBuffer *txbuf, GtkTextIter * it, IacaItem *itm)
+insert_item_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
 {
   const char *nam = 0;
+  GtkTextIter begit = *it;
+  gint begoff = 0;
+  gint endoff = 0;
   g_assert (GTK_IS_TEXT_BUFFER (txbuf));
-  g_assert (it != NULL);
   g_assert (itm != NULL && itm->v_kind == IACAV_ITEM);
+  begoff = gtk_text_iter_get_offset (&begit);
   nam = iaca_string_val
     (iaca_item_attribute_physical_get ((IacaValue *) itm,
 				       (IacaValue *) iacafirst_itname));
-  if (nam)
-    gtk_text_buffer_insert_with_tags_by_name (txbuf, it, nam, -1, NULL);
+  {
+    if (nam)
+      gtk_text_buffer_insert_with_tags_by_name (txbuf, it, nam, -1, "item",
+						NULL);
+  }
+  endoff = gtk_text_iter_get_offset (it);
+  gtk_text_buffer_get_iter_at_offset (txbuf, &begit, begoff);
 #warning insert_item_txbuf very incomplete
 }
 
@@ -660,7 +674,7 @@ iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
   nbattrs = iaca_item_number_attributes ((IacaValue *) itd);
   if (nbattrs > 0)
     attrs = iaca_alloc_data (sizeof (IacaItem *) * (nbattrs + 1));
-  /* first, get the attributes and sort them. For named attributes,
+  /* first, get the attributes and sort them.  For named attributes,
      the sorting is alphanumeric. */
   memset (attrs, 0, sizeof (IacaItem *) * nbattrs);
   atcnt = 0;

@@ -10,6 +10,7 @@
 -T GtkWidget
 -T GObject
 -T GtkTextBuffer
+-T GtkTextIter
 -T GtkTextTag
 -T GtkTextView
 -T GtkButton
