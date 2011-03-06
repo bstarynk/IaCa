@@ -633,9 +633,9 @@ display_item_cmp (const void *p1, const void *p2)
   return g_strcmp0 (n1, n2);
 }
 
-#warning we really should have a tree [ie node] representation of every item!
+
 static void
-insert_item_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
+insert_itemref_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
 {
   const char *nam = 0;
   GtkTextIter begit = *it;
@@ -654,7 +654,7 @@ insert_item_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
   }
   endoff = gtk_text_iter_get_offset (it);
   gtk_text_buffer_get_iter_at_offset (txbuf, &begit, begoff);
-#warning insert_item_txbuf very incomplete
+#warning insert_itemref_txbuf very incomplete
 }
 
 /* display an item, returned value is ignored, v1 is the boxed gtk
@@ -703,7 +703,7 @@ iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
 #define BEGIN_ATTR_DECOR " \342\227\246"	/* ◦ U+25E6 WHITE BULLET */
       gtk_text_buffer_insert_with_tags_by_name
 	(txbuf, &endit, BEGIN_ATTR_DECOR, -1, NULL);
-      insert_item_txbuf (txbuf, &endit, curat);
+      insert_itemref_txbuf (txbuf, &endit, curat);
       /* should insert the decoration for curval, and curval itself */
     }
   iaca_error ("iacafirst_displayitemcontent unimplemented");

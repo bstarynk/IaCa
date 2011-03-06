@@ -387,6 +387,7 @@ enum iacapayloadkind_en
   IACAPAYLOAD_DICTIONNARY,
   IACAPAYLOAD_QUEUE,
   IACAPAYLOAD_CLOSURE,
+  IACAPAYLOAD_COMPUTEDATTRIBUTE,
 };
 
 /* Item structure; each has a unique 64 bits identifying unique
@@ -417,6 +418,7 @@ struct iacaitem_st
     struct iacapayloaddictionnary_st *v_payloaddict;	/* when IACAPAYLOAD_DICTIONNARY */
     struct iacapayloadqueue_st *v_payloadqueue;	/* when IACAPAYLOAD_QUEUE */
     struct iacapayloadclosure_st *v_payloadclosure;	/* when IACAPAYLOAD_CLOSURE */
+    struct iacapayloadcomputedattribute_st *v_payloadcomputedattribute;	/* when IACAPAYLOAD_COMPUTEDATTRIBUTE */
   };
 };
 // safe casting to IacaItem
@@ -493,7 +495,7 @@ enum iacaclofunsig_en
 struct iacaclofun_st
 {
   const unsigned cfun_magic;	/* always IACA_CLOFUN_MAGIC */
-  /* The number of closed value in the containing closure: */
+  /* The number of closed values in the containing closure: */
   const unsigned cfun_nbval;
   /* the signature of the function */
   enum iacaclofunsig_en cfun_sig;
@@ -546,6 +548,46 @@ struct iacapayloadclosure_st
   IacaValue *clo_valtab[];	/* size is given by cfun_nbval of clo_fun */
 };
 
+////////////////
+
+#define IACA_COMPUTEDATTRFUN_MAGIC 0x585ee66f	/*1482614383 */
+struct iacacomputedattrfun_st
+{
+  unsigned compattr_magic;	/* always IACA_COMPUTEDATTRFUN_MAGIC */
+  /* The number of closed values in the containing attribute closure: */
+  const unsigned compattr_nbval;
+  /* The module name is the basename of the C file containing the code:  */
+  const char *compattr_module;
+  /* The getting routine may be null */
+  IacaValue *(*compattr_getter) (IacaItem *item, IacaItem *attr,
+				 IacaValue *vdef);
+  /* The putting routine may be null */
+  void (*compattr_putter) (IacaItem *item, IacaItem *attr, IacaValue *val);
+  /* The name is FOO when the entire iacacomputedattrfun_st structure is
+     iacacompattr_FOO: */
+  const char compattr_name[];
+};
+
+#define IACA_DEFINE_COMPUTEDATTR(Name,Nbval,Get,Put)		\
+  const struct iacacomputedattrfun_st iacacompattr_##Name = {	\
+    .compattr_magic = IACA_COMPUTEDATTRFUN_MAGIC,		\
+    .compattr_nbval = Nbval,					\
+    .compattr_getter = Get,					\
+    .compattr_putter = Put,					\
+    .compattr_module = IACA_MODULE,				\
+    .compattr_name = #Name					\
+}
+
+extern const struct iacacomputedattrfun_st *iaca_find_compattrfun (const char
+								   *name);
+
+struct iacapayloadcomputedattribute_st
+{
+  const struct iacacomputedattrfun_st *cpa_fun;
+  IacaValue *cpa_valtab[];	/* size is given by compattr_nbval of cpa_fun */
+};
+
+
 /* make an item */
 extern IacaItem *iaca_item_make (struct iacadataspace_st *sp);
 #define iacav_item_make(Sp) ((IacaValue*) iaca_item_make((Sp)))
@@ -591,6 +633,16 @@ static inline IacaValue *iaca_item_attribute_physical_get_def (IacaValue
 
 #define iaca_item_attribute_physical_get(Vitem,Vattr) \
   iaca_item_attribute_physical_get_def((Vitem),(Vattr),(IacaValue*)0)
+
+/* in item vitem, logically get the value associate to attribute vattr
+   or else default vdef; if the attribute is absent and has a getting
+   routine, use it */
+static inline IacaValue *iaca_item_attribute_get_def (IacaValue *vitem,
+						      IacaValue *vattr,
+						      IacaValue *vdef);
+
+#define iaca_item_attribute_get(Vitem,Vattr) \
+  iaca_item_attribute_get_def((Vitem),(Vattr),(IacaValue*)0)
 
 /* inside an item vitem put attribute vattr associated to value
    val. Don't do anything if vitem or vattr are not items, or if val
@@ -853,6 +905,52 @@ iaca_item_pay_load_closure_set_nth (IacaItem *itm, int rk, IacaValue *val)
     clo->clo_valtab[rk] = val;
 }
 
+
+////////////////////////////////////////////////////////////////
+extern void
+iaca_item_pay_load_make_computed_attribute_varf (IacaItem *itm,
+						 const struct
+						 iacacomputedattrfun_st *cfa,
+						 ...);
+
+static inline IacaValue *
+iaca_item_pay_load_computed_attribute_nth (IacaItem *itm, int rk)
+{
+  struct iacapayloadcomputedattribute_st *clo = 0;
+  const struct iacacomputedattrfun_st *cfa = 0;
+  unsigned nbv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (itm->v_payloadkind != IACAPAYLOAD_COMPUTEDATTRIBUTE
+      || (clo = itm->v_payloadcomputedattribute) == NULL
+      || (cfa = clo->cpa_fun) == NULL || (nbv = cfa->compattr_nbval) == 0)
+    return NULL;
+  if (rk < 0)
+    rk += (int) nbv;
+  if (rk >= 0 && rk < (int) nbv)
+    return clo->cpa_valtab[rk];
+  return NULL;
+}
+
+static inline void
+iaca_item_pay_load_computed_attribute_set_nth (IacaItem *itm, int rk,
+					       IacaValue *val)
+{
+  struct iacapayloadcomputedattribute_st *clo = 0;
+  const struct iacacomputedattrfun_st *cfa = 0;
+  unsigned nbv = 0;
+  if (!itm || itm->v_kind != IACAV_ITEM)
+    return;
+  if (itm->v_payloadkind != IACAPAYLOAD_COMPUTEDATTRIBUTE
+      || (clo = itm->v_payloadcomputedattribute) == NULL
+      || (cfa = clo->cpa_fun) == NULL || (nbv = cfa->compattr_nbval) == 0)
+    return;
+  if (rk < 0)
+    rk += (int) nbv;
+  if (rk >= 0 && rk < (int) nbv)
+    clo->cpa_valtab[rk] = val;
+}
+
 ////////////////////////////////////////////////////////////////
 /* recursively copy a value (and the sons of nodes) */
 extern IacaValue *iaca_copy (IacaValue *);
@@ -874,6 +972,9 @@ extern struct iacastate_st
   /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
      strings */
   GHashTable *ia_clofun_htab;
+  /* hashtable of iacacomputedattrfun_st to speed-up
+     iaca_find_compattrfun. Keys are strings. */
+  GHashTable *ia_compattrfun_htab;
   /* hashtable associating GObject* to their boxed values if any */
   GHashTable *ia_boxgobject_htab;
   /* last item identifier */
@@ -1086,6 +1187,39 @@ iaca_item_attribute_physical_get_def (IacaValue *vitem, IacaValue *vattr,
   ix = iaca_attribute_index_unsafe (tbl, attr);
   if (ix < 0)
     return vdef;
+  return tbl->at_entab[ix].en_val;
+}
+
+
+static inline IacaValue *
+iaca_item_attribute_get_def (IacaValue *vitem,
+			     IacaValue *vattr, IacaValue *vdef)
+{
+  IacaItem *item = 0;
+  IacaItem *attr = 0;
+  struct iacatabattr_st *tbl = 0;
+  const struct iacacomputedattrfun_st *cpa = 0;
+  int ix = -1;
+  if (!vitem || vitem->v_kind != IACAV_ITEM
+      || !vattr || vattr->v_kind != IACAV_ITEM)
+    return vdef;
+  item = (IacaItem *) vitem;
+  attr = (IacaItem *) vattr;
+  tbl = item->v_attrtab;
+  if (!tbl)
+    return vdef;
+  ix = iaca_attribute_index_unsafe (tbl, attr);
+  if (ix < 0)
+    {
+      if (attr->v_payloadkind == IACAPAYLOAD_COMPUTEDATTRIBUTE
+	  && attr->v_payloadcomputedattribute
+	  && (cpa = attr->v_payloadcomputedattribute->cpa_fun)
+	  && cpa->compattr_magic == IACA_COMPUTEDATTRFUN_MAGIC
+	  && cpa->compattr_getter)
+	return cpa->compattr_getter (item, attr, vdef);
+      else
+	return vdef;
+    }
   return tbl->at_entab[ix].en_val;
 }
 
