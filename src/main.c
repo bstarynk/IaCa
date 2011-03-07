@@ -1401,35 +1401,7 @@ iaca_find_clofun (const char *name)
   return ptr;
 }
 
-const struct iacacomputedattrfun_st *
-iaca_find_compattrfun (const char *name)
-{
-  struct iacacomputedattrfun_st *cf = 0;
-  gchar *s = 0;
-  gpointer ptr = 0;
-  if (!name || !name[0])
-    return NULL;
-  if (!iaca.ia_compattrfun_htab)
-    iaca.ia_compattrfun_htab = g_hash_table_new (g_str_hash, g_str_equal);
-  cf = (struct iacacomputedattrfun_st *)
-    g_hash_table_lookup (iaca.ia_compattrfun_htab, (gpointer) name);
-  if (cf)
-    return cf;
-  s = g_strdup_printf ("iacacompattr_%s", name);
-  if (!g_module_symbol (iaca.ia_progmodule, s, &ptr) || !ptr)
-    {
-      iaca_warning ("not found %s - %s", s, g_module_error ());
-      g_free (s);
-      return 0;
-    }
-  iaca_debug ("found %s at %p", s, ptr);
-  g_hash_table_insert (iaca.ia_compattrfun_htab, s, ptr);
-  cf = (struct iacacomputedattrfun_st *) ptr;
-  g_assert (!strcmp (cf->compattr_name, name));
-  g_assert (cf->compattr_magic == IACA_COMPUTEDATTRFUN_MAGIC);
-  /* don't free because it is inserted! */
-  return ptr;
-}
+
 
 void
 iaca_item_pay_load_make_closure (IacaItem *itm,
@@ -1503,60 +1475,6 @@ iaca_item_pay_load_closure_gobject_do (GObject *gob, IacaItem *cloitm)
   cfun->cfun_gobject_do (gob, cloitm);
 }
 
-
-void
-iaca_item_pay_load_make_computed_attribute (IacaItem *itm,
-					    const struct
-					    iacacomputedattrfun_st *cfa,
-					    IacaValue **valtab)
-{
-  unsigned nbv = 0;
-  struct iacapayloadcomputedattribute_st *cpa = 0;
-  if (!itm || itm->v_kind != IACAV_ITEM || !cfa
-      || cfa->compattr_magic != IACA_COMPUTEDATTRFUN_MAGIC)
-    return;
-  nbv = cfa->compattr_nbval;
-  cpa = iaca_alloc_data (sizeof (*cpa) + nbv * sizeof (IacaValue *));
-  if (itm->v_payloadkind != IACAPAYLOAD_COMPUTEDATTRIBUTE)
-    {
-      iaca_item_pay_load_clear (itm);
-      itm->v_payloadkind = IACAPAYLOAD_COMPUTEDATTRIBUTE;
-    }
-  itm->v_payloadcomputedattribute = cpa;
-  cpa->cpa_fun = cfa;
-  if (valtab)
-    {
-      for (unsigned ix = 0; ix < nbv; ix++)
-	cpa->cpa_valtab[ix] = valtab[ix];
-    }
-}
-
-void
-iaca_item_pay_load_make_computed_attribute_varf (IacaItem *itm,
-						 const struct
-						 iacacomputedattrfun_st *cfa,
-						 ...)
-{
-  unsigned nbv = 0;
-  struct iacapayloadcomputedattribute_st *cpa = 0;
-  va_list args;
-  if (!itm || itm->v_kind != IACAV_ITEM || !cfa
-      || cfa->compattr_magic != IACA_COMPUTEDATTRFUN_MAGIC)
-    return;
-  nbv = cfa->compattr_nbval;
-  cpa = iaca_alloc_data (sizeof (*cpa) + nbv * sizeof (IacaValue *));
-  if (itm->v_payloadkind != IACAPAYLOAD_COMPUTEDATTRIBUTE)
-    {
-      iaca_item_pay_load_clear (itm);
-      itm->v_payloadkind = IACAPAYLOAD_COMPUTEDATTRIBUTE;
-    }
-  itm->v_payloadcomputedattribute = cpa;
-  cpa->cpa_fun = cfa;
-  va_start (args, cfa);
-  for (unsigned ix = 0; ix < nbv; ix++)
-    cpa->cpa_valtab[ix] = va_arg (args, IacaValue *);
-  va_end (args);
-}
 
 ////////////////////////////////////////////////////////////////
 IacaValue *

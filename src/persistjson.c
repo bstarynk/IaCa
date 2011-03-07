@@ -362,33 +362,6 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	    iaca_item_pay_load_closure_set_nth
 	      (itm, ix, iaca_json_to_value (ld, json_array_get (jsarr, ix)));
 	}
-      else if (!strcmp (kdstr, "computedattribute"))
-	{
-	  json_t *jsclo = json_object_get (js, "payloadcompattrfun");
-	  const char *funam = json_string_value (jsclo);
-	  json_t *jsarr = json_object_get (js, "payloadcompattrval");
-	  const struct iacacomputedattrfun_st *cfa =
-	    iaca_find_compattrfun (funam);
-	  int ln = json_array_size (jsarr);
-	  int prjf = 0;
-	  iaca_debug ("jsclo %p ...", jsclo);
-	  if (iaca.ia_debug)
-	    prjf = json_dumpf (jsclo, stdout, 0);
-	  iaca_debug ("jsprinted %s", fflush (stdout)
-		      || prjf ? "failed" : "ok");
-	  iaca_debug ("funam '%s' cfun %p ident #%lld", funam, cfa,
-		      (long long) itm->v_ident);
-	  if (!cfa)
-	    iaca_json_error_printf
-	      (ld,
-	       "not found computed attribute function '%s' for closure payload of #%lld",
-	       funam, (long long) itm->v_ident);
-	  g_assert (cfa->compattr_magic == IACA_COMPUTEDATTRFUN_MAGIC);
-	  iaca_item_pay_load_make_computed_attribute (itm, cfa, NULL);
-	  for (int ix = 0; ix < ln; ix++)
-	    iaca_item_pay_load_computed_attribute_set_nth
-	      (itm, ix, iaca_json_to_value (ld, json_array_get (jsarr, ix)));
-	}
       else
 	iaca_json_error_printf (ld, "unexepected payload kind %s", kdstr);
     }
@@ -845,16 +818,6 @@ iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
 	  iaca_dump_scan_value (du, clo->clo_valtab[ix]);
 	break;
       }
-    case IACAPAYLOAD_COMPUTEDATTRIBUTE:
-      {
-	struct iacapayloadcomputedattribute_st *clo =
-	  itm->v_payloadcomputedattribute;
-	unsigned len = (clo
-			&& clo->cpa_fun) ? clo->cpa_fun->compattr_nbval : 0;
-	for (unsigned ix = 0; ix < len; ix++)
-	  iaca_dump_scan_value (du, clo->cpa_valtab[ix]);
-	break;
-      }
     }
 }
 
@@ -1125,37 +1088,6 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
 							   clo->clo_valtab
 							   [ix]));
 	    json_object_set (js, "payloadcloval", jsarr);
-	    return js;
-	  }
-	else
-	  return json_null ();
-      }
-    case IACAPAYLOAD_COMPUTEDATTRIBUTE:
-      {
-	struct iacapayloadcomputedattribute_st *cpa =
-	  itm->v_payloadcomputedattribute;
-	const struct iacacomputedattrfun_st *cfa = 0;
-	if (cpa && (cfa = cpa->cpa_fun) != NULL)
-	  {
-	    unsigned len = cfa->compattr_nbval;
-	    json_t *jsarr = json_array ();
-	    g_assert (cfa->compattr_magic == IACA_COMPUTEDATTRFUN_MAGIC);
-	    g_assert (cfa->compattr_module != NULL);
-	    if (!g_tree_lookup (du->du_moduletree, cfa->compattr_module))
-	      g_tree_insert (du->du_moduletree,
-			     (gpointer) cfa->compattr_module,
-			     (gpointer) cfa->compattr_module);
-	    js = json_object ();
-	    json_object_set (js, "payloadkind",
-			     json_string ("computedattribute"));
-	    json_object_set (js, "payloadcompattrfun",
-			     json_string (cfa->compattr_name));
-	    for (unsigned ix = 0; ix < len; ix++)
-	      json_array_append_new (jsarr,
-				     iaca_dump_value_json (du,
-							   cpa->cpa_valtab
-							   [ix]));
-	    json_object_set (js, "payloadcompattrval", jsarr);
 	    return js;
 	  }
 	else
