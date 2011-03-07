@@ -593,6 +593,8 @@ IACA_DEFINE_CLOFUN (namededitor,
 /// closed values for displayitemcontent
 enum iacadisplayitemcontentval_en
 {
+  IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER,
+  IACADISPLAYITEMCONTENT_VALUEDISPLAYER,
   IACADISPLAYITEMCONTENT__LAST
 };
 
@@ -634,8 +636,9 @@ display_item_cmp (const void *p1, const void *p2)
 }
 
 
+#if 0
 static void
-insert_itemref_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
+olsinsert_itemref_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
 {
   const char *nam = 0;
   GtkTextIter begit = *it;
@@ -656,20 +659,30 @@ insert_itemref_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
   gtk_text_buffer_get_iter_at_offset (txbuf, &begit, begoff);
 #warning insert_itemref_txbuf very incomplete
 }
+#endif
 
 /* display an item, returned value is ignored, v1 is the boxed gtk
    text buffer v2 is the item to display */
 static IacaValue *
-iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
+iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
+			      IacaItem *cloitm)
 {
   GtkTextBuffer *txbuf = 0;
   GtkTextIter endit = { };
+  IacaItem *ititrefdisplayer = 0;
+  IacaItem *itvaluedisplayer = 0;
   IacaItem *itd = iacac_item (v2);
   IacaItem **attrs = 0;
   int nbattrs = 0;
   int atcnt = 0;
-  g_assert (GTK_IS_TEXT_BUFFER (iaca_gobject (v1)));
-  txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1));
+  ititrefdisplayer =
+    iacac_item (iaca_item_pay_load_closure_nth
+		(cloitm, IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER));
+  itvaluedisplayer =
+    iacac_item (iaca_item_pay_load_closure_nth
+		(cloitm, IACADISPLAYITEMCONTENT_VALUEDISPLAYER));
+  g_assert (GTK_IS_TEXT_BUFFER (iaca_gobject (v1txbuf)));
+  txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
   g_assert (itd != NULL);
   nbattrs = iaca_item_number_attributes ((IacaValue *) itd);
   if (nbattrs > 0)
@@ -702,8 +715,19 @@ iacafirst_displayitemcontent (IacaValue *v1, IacaValue *v2, IacaItem *cloitm)
       gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
 #define BEGIN_ATTR_DECOR " \342\227\246"	/* ◦ U+25E6 WHITE BULLET */
       gtk_text_buffer_insert_with_tags_by_name
-	(txbuf, &endit, BEGIN_ATTR_DECOR, -1, NULL);
-      insert_itemref_txbuf (txbuf, &endit, curat);
+	(txbuf, &endit, BEGIN_ATTR_DECOR, -1, "decor", NULL);
+      iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
+					       (IacaValue *) curat,
+					       (IacaValue *) NULL,
+					       ititrefdisplayer);
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+#define ATTR_TO_VALUE_DECOR " \342\206\246 "	/* ↦ U+21A6 RIGHTWARDS ARROW FROM BAR */
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, ATTR_TO_VALUE_DECOR, -1, "decor", NULL);
+      iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
+					       (IacaValue *) curval,
+					       (IacaValue *) NULL,
+					       itvaluedisplayer);
       /* should insert the decoration for curval, and curval itself */
     }
   iaca_error ("iacafirst_displayitemcontent unimplemented");
