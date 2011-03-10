@@ -742,6 +742,52 @@ IACA_DEFINE_CLOFUN (displayitemcontent,
 
 ////////////////////////////////////////////////////////////////
 
+/// closed values for itemrefdisplayer
+enum iacaitemrefdisplayerval_en
+{
+  IACAITEMREFDISPLAYER__LAST
+};
+
+static IacaValue *
+iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
+			    IacaValue *v3pos, IacaItem *cloitm)
+{
+  IacaValue *res = 0;
+#warning unimplemented iacafirst_itemrefdisplayer
+  iaca_error ("unimplemented iacafirst_itemrefdisplayer");
+  return res;
+}
+
+IACA_DEFINE_CLOFUN (itemrefdisplayer,
+		    IACAITEMREFDISPLAYER__LAST, three_values,
+		    iacafirst_itemrefdisplayer);
+
+
+////////////////////////////////////////////////////////////////
+
+/// closed values for valuedisplayer
+enum iacavaluedisplayerval_en
+{
+  IACAVALUEDISPLAYER__LAST
+};
+
+static IacaValue *
+iacafirst_valuedisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
+			  IacaValue *v3pos, IacaItem *cloitm)
+{
+  IacaValue *res = 0;
+#warning unimplemented iacafirst_valuedisplayer
+  iaca_error ("unimplemented iacafirst_valuedisplayer");
+  return res;
+}
+
+IACA_DEFINE_CLOFUN (valuedisplayer,
+		    IACAVALUEDISPLAYER__LAST, three_values,
+		    iacafirst_valuedisplayer);
+
+
+////////////////////////////////////////////////////////////////
+
 
 void
 iacamod_first_init1 (void)
@@ -752,6 +798,8 @@ iacamod_first_init1 (void)
   IacaItem *itname = 0;
   IacaItem *itnamededitor = 0;
   IacaItem *itdisplitem = 0;
+  IacaItem *ititrefdisplayer = 0;
+  IacaItem *itvaluedisplayer = 0;
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
@@ -775,13 +823,32 @@ iacamod_first_init1 (void)
   if (!(itdisplitem
 	= iacac_item (iaca_item_pay_load_closure_nth
 		      (itnamededitor, IACANAMEDEDITOR_DISPLAYITEMCONTENT))))
+    iaca_error ("missing itdisplitem");
+  if (!(ititrefdisplayer
+	= iacac_item (iaca_item_pay_load_closure_nth
+		      (itdisplitem,
+		       IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER))))
     {
-      itdisplitem = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itdisplitem,
-				       &iacacfun_displayitemcontent,
+      ititrefdisplayer = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_make_closure (ititrefdisplayer,
+				       &iacacfun_itemrefdisplayer,
 				       (IacaValue **) 0);
       iaca_item_pay_load_closure_set_nth
-	(itnamededitor,
-	 IACANAMEDEDITOR_DISPLAYITEMCONTENT, (IacaValue *) itdisplitem);
+	(itdisplitem,
+	 IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER,
+	 (IacaValue *) ititrefdisplayer);
+    }
+  if (!(itvaluedisplayer
+	= iacac_item (iaca_item_pay_load_closure_nth
+		      (itdisplitem, IACADISPLAYITEMCONTENT_VALUEDISPLAYER))))
+    {
+      itvaluedisplayer = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_make_closure (itvaluedisplayer,
+				       &iacacfun_valuedisplayer,
+				       (IacaValue **) 0);
+      iaca_item_pay_load_closure_set_nth
+	(itdisplitem,
+	 IACADISPLAYITEMCONTENT_VALUEDISPLAYER,
+	 (IacaValue *) itvaluedisplayer);
     }
 }
