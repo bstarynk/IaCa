@@ -165,13 +165,13 @@ save_dialog_cb (GtkWidget *w, gpointer ptr)
      GTK_BUTTONS_NONE,
      "<b>Save IaCa state</b> to directory\n <tt>%s</tt> ?\n",
      iaca.ia_statedir);
-  gtk_dialog_add_buttons (GTK_DIALOG (dial), GTK_STOCK_SAVE,
-			  GTK_RESPONSE_ACCEPT, GTK_STOCK_QUIT,
-			  GTK_RESPONSE_NO, GTK_STOCK_CANCEL,
-			  GTK_RESPONSE_REJECT, NULL);
+  gtk_dialog_add_buttons (GTK_DIALOG (dial),
+			  GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
+			  GTK_STOCK_CLOSE, GTK_RESPONSE_NO,
+			  GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
   gtk_message_dialog_format_secondary_markup (GTK_MESSAGE_DIALOG (dial),
 					      "<i>Save</i> to save the state to directory\n <tt>%s</tt> and continue,\n\n"
-					      "<i>Quit</i> to save the state and quit,\n\n"
+					      "<i>Close</i> to save the state and quit,\n\n"
 					      "<i>Cancel</i> to continue without saving\n",
 					      iaca.ia_statedir);
   gtk_widget_show_all (GTK_WIDGET (dial));
@@ -555,7 +555,17 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 			      "foreground", "blue",
 			      "scale", PANGO_SCALE_SMALL,
 			      "style", PANGO_STYLE_ITALIC, NULL);
-  gtk_text_buffer_create_tag (txbuf, "item", "background", "orange", NULL);
+  gtk_text_buffer_create_tag (txbuf, "decor", "foreground", "brick", NULL);
+  gtk_text_buffer_create_tag (txbuf, "literal",
+			      "foreground", "darkgreen",
+			      "background", "lightpink",
+			      "family", "Andale Mono",
+			      "style", PANGO_STYLE_ITALIC, NULL);
+  gtk_text_buffer_create_tag (txbuf, "itemname",
+			      "background", "orange", NULL);
+  gtk_text_buffer_create_tag (txbuf, "itemserial",
+			      "background", "red",
+			      "style", PANGO_STYLE_ITALIC, NULL);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
   gtk_text_buffer_insert_with_tags_by_name
@@ -730,8 +740,8 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
 					       itvaluedisplayer);
       /* should insert the decoration for curval, and curval itself */
     }
-  iaca_error ("iacafirst_displayitemcontent unimplemented");
-#warning iacafirst_displayitemcontent unimplemented
+  iaca_warning ("iacafirst_displayitemcontent not fully implemented");
+#warning iacafirst_displayitemcontent not fully implemented
   return NULL;
 }
 
@@ -750,11 +760,32 @@ enum iacaitemrefdisplayerval_en
 
 static IacaValue *
 iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
-			    IacaValue *v3pos, IacaItem *cloitm)
+			    IacaValue *v3off, IacaItem *cloitm)
 {
   IacaValue *res = 0;
-#warning unimplemented iacafirst_itemrefdisplayer
-  iaca_error ("unimplemented iacafirst_itemrefdisplayer");
+  const char *nam = 0;
+  long off = iaca_integer_val_def (v3off, -1L);
+  GtkTextBuffer *txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
+  IacaItem *itm = iacac_item (v2itm);
+  GtkTextIter txit = { };
+  iaca_debug ("off %ld txbuf %p itm %p #%lld",
+	      off, txbuf, itm, iaca_item_identll (itm));
+  gtk_text_buffer_get_iter_at_offset (txbuf, &txit, off);
+  nam = iaca_string_val
+    (iaca_item_attribute_physical_get ((IacaValue *) itm,
+				       (IacaValue *) iacafirst_itname));
+  if (nam)
+    gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, nam, -1,
+					      "itemname", NULL);
+  else
+    {
+      char bufnum[48];
+      memset (bufnum, 0, sizeof (bufnum));
+      snprintf (bufnum, sizeof (bufnum) - 1, "#%lld",
+		iaca_item_identll (itm));
+      gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, bufnum, -1,
+						"itemserial", NULL);
+    }
   return res;
 }
 
@@ -768,16 +799,67 @@ IACA_DEFINE_CLOFUN (itemrefdisplayer,
 /// closed values for valuedisplayer
 enum iacavaluedisplayerval_en
 {
+  IACAVALUEDISPLAYER_DISPLAYITEMREF,
   IACAVALUEDISPLAYER__LAST
 };
 
 static IacaValue *
-iacafirst_valuedisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
-			  IacaValue *v3pos, IacaItem *cloitm)
+iacafirst_valuedisplayer (IacaValue *v1txbuf, IacaValue *v2val,
+			  IacaValue *v3off, IacaItem *cloitm)
 {
   IacaValue *res = 0;
+  long off = iaca_integer_val_def (v3off, -1L);
+  GtkTextBuffer *txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
+  GtkTextIter txit = { };
+  iaca_debug ("off %ld txbuf %p", off, txbuf);
+  gtk_text_buffer_get_iter_at_offset (txbuf, &txit, off);
+  if (!v2val)
+#define DECOR_NULL " \342\254\240 "	/* U+2B20 WHITE PENTAGON ⬠ */
+    gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit,
+					      DECOR_NULL, -1, "decor", NULL);
+  else
+    switch (v2val->v_kind)
+      {
+      case IACAV_INTEGER:
+	{
+#define DECOR_INTEGER " \342\201\230"	/* U+2058 FOUR DOT PUNCTUATION ⁘ */
+	  char lbuf[48];
+	  long l = iaca_integer_val (v2val);
+	  memset (lbuf, 0, sizeof (lbuf));
+	  snprintf (lbuf, sizeof (lbuf) - 1, "%ld", l);
+	  gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit,
+						    DECOR_INTEGER, -1,
+						    "decor", NULL);
+	  gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, lbuf, -1,
+						    "literal", NULL);
+	  break;
+	}
+      case IACAV_STRING:
+	{
+#define DECOR_STRING_START " \342\200\234"	/* U+201C LEFT DOUBLE QUOTATION MARK “ */
+#define DECOR_STRING_END "\342\200\235 "	/* U+201D RIGHT DOUBLE QUOTATION MARK ” */
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, DECOR_STRING_START, -1, "decor", NULL);
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, iaca_string_valempty (v2val), -1, "literal", NULL);
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, DECOR_STRING_END, -1, "decor", NULL);
+	  break;
+	}
+      case IACAV_NODE:
+	{
+	  IacaItem *itcon = iaca_node_conn (v2val);
+	  int arity = iaca_node_arity (v2val);
+#define DECOR_NODE_PREFIX " \342\200\243"	/* U+2023 TRIANGULAR BULLET ‣ */
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, DECOR_NODE_PREFIX, -1, "decor", NULL);
+	}
+      case IACAV_SET:
+      case IACAV_ITEM:
+      default:
+	iaca_error ("invalid kind %d", (int) v2val->v_kind);
+      }
 #warning unimplemented iacafirst_valuedisplayer
-  iaca_error ("unimplemented iacafirst_valuedisplayer");
   return res;
 }
 
@@ -828,27 +910,23 @@ iacamod_first_init1 (void)
 	= iacac_item (iaca_item_pay_load_closure_nth
 		      (itdisplitem,
 		       IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER))))
-    {
-      ititrefdisplayer = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (ititrefdisplayer,
-				       &iacacfun_itemrefdisplayer,
-				       (IacaValue **) 0);
-      iaca_item_pay_load_closure_set_nth
-	(itdisplitem,
-	 IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER,
-	 (IacaValue *) ititrefdisplayer);
-    }
+    iaca_error ("missing ititrefdisplayer");
   if (!(itvaluedisplayer
 	= iacac_item (iaca_item_pay_load_closure_nth
 		      (itdisplitem, IACADISPLAYITEMCONTENT_VALUEDISPLAYER))))
-    {
-      itvaluedisplayer = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itvaluedisplayer,
-				       &iacacfun_valuedisplayer,
-				       (IacaValue **) 0);
-      iaca_item_pay_load_closure_set_nth
-	(itdisplitem,
-	 IACADISPLAYITEMCONTENT_VALUEDISPLAYER,
-	 (IacaValue *) itvaluedisplayer);
-    }
+    iaca_error ("missing itvaluedisplayer");
+  iaca_item_pay_load_closure_set_nth
+    (itvaluedisplayer,
+     IACAVALUEDISPLAYER_DISPLAYITEMREF, (IacaValue *) itdisplitem);
+#if 0
+  {
+    itvaluedisplayer = iaca_item_make (iacafirst_dsp);
+    iaca_item_pay_load_make_closure (itvaluedisplayer,
+				     &iacacfun_valuedisplayer,
+				     (IacaValue **) 0);
+    iaca_item_pay_load_closure_set_nth
+      (itdisplitem,
+       IACADISPLAYITEMCONTENT_VALUEDISPLAYER, (IacaValue *) itvaluedisplayer);
+  }
+#endif
 }

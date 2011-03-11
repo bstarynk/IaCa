@@ -218,7 +218,7 @@ extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
 // safe accessors
 // get the connective or a default
 static inline IacaValue *iaca_node_conn_def (IacaValue *v, IacaValue *def);
-#define iaca_node_conn(V) iaca_node_conn_def(v,(IacaValue*)0)
+#define iaca_node_conn(V) iaca_node_conn_def((V),(IacaValue*)0)
 
 // get the arity or a default; gives a signed integer
 static inline int iaca_node_arity_def (IacaValue *v, int def);
