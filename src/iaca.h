@@ -279,6 +279,11 @@ static inline IacaValue *iaca_set_after_element (IacaValue *vset,
        (Elem) != NULL;					\
        Elem = iaca_set_after_element((Set),(Elem)))
 
+#define IACA_FOREACH_SET_ELEMENT_LOCAL(Set,Elem)	\
+  for (IacaValue* Elem=iaca_set_first_element((Set));	\
+       (Elem) != NULL;					\
+       Elem = iaca_set_after_element((Set),(Elem)))
+
 /* return the canonical empty set*/
 extern IacaSet *iaca_the_empty_set (void);
 

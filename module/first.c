@@ -738,7 +738,6 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
 					       (IacaValue *) curval,
 					       (IacaValue *) NULL,
 					       itvaluedisplayer);
-      /* should insert the decoration for curval, and curval itself */
     }
   iaca_warning ("iacafirst_displayitemcontent not fully implemented");
 #warning iacafirst_displayitemcontent not fully implemented
@@ -810,6 +809,9 @@ iacafirst_valuedisplayer (IacaValue *v1txbuf, IacaValue *v2val,
   IacaValue *res = 0;
   long off = iaca_integer_val_def (v3off, -1L);
   GtkTextBuffer *txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
+  IacaItem *ititrefdisplayer
+    = iacac_item (iaca_item_pay_load_closure_nth (cloitm,
+						  IACAVALUEDISPLAYER_DISPLAYITEMREF));
   GtkTextIter txit = { };
   iaca_debug ("off %ld txbuf %p", off, txbuf);
   gtk_text_buffer_get_iter_at_offset (txbuf, &txit, off);
@@ -848,18 +850,77 @@ iacafirst_valuedisplayer (IacaValue *v1txbuf, IacaValue *v2val,
 	}
       case IACAV_NODE:
 	{
-	  IacaItem *itcon = iaca_node_conn (v2val);
+	  IacaItem *itcon = iacac_item (iaca_node_conn (v2val));
 	  int arity = iaca_node_arity (v2val);
 #define DECOR_NODE_PREFIX " \342\200\243"	/* U+2023 TRIANGULAR BULLET ‣ */
 	  gtk_text_buffer_insert_with_tags_by_name
 	    (txbuf, &txit, DECOR_NODE_PREFIX, -1, "decor", NULL);
+	  iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
+						   (IacaValue *) itcon,
+						   (IacaValue *) NULL,
+						   ititrefdisplayer);
+#define DECOR_NODE_BEFORE_ARGS " ("
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, DECOR_NODE_BEFORE_ARGS, -1, "decor", NULL);
+	  for (int ix = 0; ix < arity; ix++)
+	    {
+#define DECOR_NODE_BETWEEN_ARGS ", "
+	      IacaValue *vson = iaca_node_son (v2val, ix);
+	      if (ix > 0)
+		gtk_text_buffer_insert_with_tags_by_name
+		  (txbuf, &txit, DECOR_NODE_BETWEEN_ARGS, -1, "decor", NULL);
+	      iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
+						       vson,
+						       (IacaValue *) NULL,
+						       cloitm);
+	    }
+#define DECOR_NODE_AFTER_ARGS ") "
+	  gtk_text_buffer_insert_with_tags_by_name
+	    (txbuf, &txit, DECOR_NODE_AFTER_ARGS, -1, "decor", NULL);
+	  break;
 	}
       case IACAV_SET:
+	{
+#define DECOR_SET_PREFIX " {"
+#define DECOR_SET_SUFFIX "} "
+#define DECOR_SET_BETWEEN_ARGS "; "
+#define DECOR_SET_EMPTY " \342\210\205 "	/* U+2205 EMPTY SET ∅ */
+	  int card = iaca_set_cardinal (v2val);
+	  int count = 0;
+	  if (card <= 0)
+	    gtk_text_buffer_insert_with_tags_by_name
+	      (txbuf, &txit, DECOR_SET_EMPTY, -1, "decor", NULL);
+	  else
+	    {
+	      gtk_text_buffer_insert_with_tags_by_name
+		(txbuf, &txit, DECOR_SET_PREFIX, -1, "decor", NULL);
+	      IACA_FOREACH_SET_ELEMENT_LOCAL (v2val, velem)
+	      {
+		if (count++ > 0)
+		  gtk_text_buffer_insert_with_tags_by_name
+		    (txbuf, &txit, DECOR_SET_BETWEEN_ARGS, -1, "decor", NULL);
+		iaca_item_pay_load_closure_three_values ((IacaValue *)
+							 v1txbuf,
+							 (IacaValue *) velem,
+							 (IacaValue *) NULL,
+							 ititrefdisplayer);
+	      }
+	      gtk_text_buffer_insert_with_tags_by_name
+		(txbuf, &txit, DECOR_SET_SUFFIX, -1, "decor", NULL);
+	    }
+	}
       case IACAV_ITEM:
+	{
+	  IacaItem *itv = iacac_item (v2val);
+	  iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
+						   (IacaValue *) itv,
+						   (IacaValue *) NULL,
+						   ititrefdisplayer);
+	  break;
+	}
       default:
 	iaca_error ("invalid kind %d", (int) v2val->v_kind);
       }
-#warning unimplemented iacafirst_valuedisplayer
   return res;
 }
 
@@ -917,7 +978,7 @@ iacamod_first_init1 (void)
     iaca_error ("missing itvaluedisplayer");
   iaca_item_pay_load_closure_set_nth
     (itvaluedisplayer,
-     IACAVALUEDISPLAYER_DISPLAYITEMREF, (IacaValue *) itdisplitem);
+     IACAVALUEDISPLAYER_DISPLAYITEMREF, (IacaValue *) ititrefdisplayer);
 #if 0
   {
     itvaluedisplayer = iaca_item_make (iacafirst_dsp);
@@ -925,8 +986,8 @@ iacamod_first_init1 (void)
 				     &iacacfun_valuedisplayer,
 				     (IacaValue **) 0);
     iaca_item_pay_load_closure_set_nth
-      (itdisplitem,
-       IACADISPLAYITEMCONTENT_VALUEDISPLAYER, (IacaValue *) itvaluedisplayer);
+      (itvaluedisplayer,
+       IACAVALUEDISPLAYER_DISPLAYITEMREF, (IacaValue *) ititrefdisplayer);
   }
 #endif
 }
