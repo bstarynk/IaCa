@@ -94,6 +94,35 @@
    "itemcontent": null,
    "itempayload": {
     "payloadclofun": "displayitemcontent",
+    "payloadcloval": [
+     {
+      "id": 7,
+      "kd": "itrv"
+     },
+     {
+      "id": 8,
+      "kd": "itrv"
+     }
+    ],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 7,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "itemrefdisplayer",
+    "payloadcloval": [],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 8,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "valuedisplayer",
     "payloadcloval": [],
     "payloadkind": "closure"
    }
