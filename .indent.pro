@@ -15,4 +15,5 @@
 -T GtkTextView
 -T GtkButton
 -T GtkDialog
+-T GdkEvent
 -T json_t

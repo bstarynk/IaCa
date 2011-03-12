@@ -743,13 +743,24 @@ enum iacaitemrefdisplayerval_en
 static gboolean
 iacafirst_item_tag_event (GtkTextTag *tag,
 			  GObject *object,
-			  GdkEvent * event, GtkTextIter *iter, gpointer data)
+			  GdkEvent *ev, GtkTextIter *iter, gpointer data)
 {
   GtkTextView *txview = GTK_TEXT_VIEW (object);
   IacaItem *itm = (IacaItem *) data;
-  iaca_debug ("tag %p txview %p event %p type %d itm %p #%lld",
-	      tag, txview, event, event ? event->type : GDK_NOTHING,
-	      itm, iaca_item_identll (itm));
+  iaca_debug ("tag %p txview %p ev %p type %d itm %p #%lld",
+	      tag, txview, ev, ev->type, itm, iaca_item_identll (itm));
+  switch (ev->type)
+    {
+    case GDK_MOTION_NOTIFY:
+      iaca_debug ("GDK_MOTION_NOTIFY x=%g y=%g", ev->motion.x, ev->motion.y);
+      break;
+    case GDK_BUTTON_PRESS:
+      iaca_debug ("GDK_BUTTON_PRESS x=%g y=%g but=%d", ev->button.x,
+		  ev->button.y, ev->button.button);
+      break;
+    default:
+      break;
+    }
   /* return FALSE to propagate the event to other handlers */
   return FALSE;
 }
