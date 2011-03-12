@@ -606,25 +606,22 @@ struct iacatabattr_st
 
 /* in item vitem, physically get the value associate to attribute
    vattr or else default vdef */
-static inline IacaValue *iaca_item_attribute_physical_get_def (IacaValue
-							       *vitem,
-							       IacaValue
-							       *vattr,
-							       IacaValue
-							       *vdef);
+static inline IacaValue *iaca_item_physical_get_def (IacaValue *vitem,
+						     IacaValue *vattr,
+						     IacaValue *vdef);
 
-#define iaca_item_attribute_physical_get(Vitem,Vattr) \
-  iaca_item_attribute_physical_get_def((Vitem),(Vattr),(IacaValue*)0)
+#define iaca_item_physical_get(Vitem,Vattr) \
+  iaca_item_physical_get_def((Vitem),(Vattr),(IacaValue*)0)
 
 /* in item vitem, logically get the value associate to attribute vattr
    or else default vdef; if the attribute is absent and has a getting
    routine, use it */
-static inline IacaValue *iaca_item_attribute_get_def (IacaValue *vitem,
-						      IacaValue *vattr,
-						      IacaValue *vdef);
+static inline IacaValue *iaca_item_get_def (IacaValue *vitem,
+					    IacaValue *vattr,
+					    IacaValue *vdef);
 
-#define iaca_item_attribute_get(Vitem,Vattr) \
-  iaca_item_attribute_get_def((Vitem),(Vattr),(IacaValue*)0)
+#define iaca_item_get(Vitem,Vattr) \
+  iaca_item_get_def((Vitem),(Vattr),(IacaValue*)0)
 
 /* inside an item vitem put attribute vattr associated to value
    val. Don't do anything if vitem or vattr are not items, or if val
@@ -1105,8 +1102,8 @@ iaca_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
 }
 
 static inline IacaValue *
-iaca_item_attribute_physical_get_def (IacaValue *vitem, IacaValue *vattr,
-				      IacaValue *vdef)
+iaca_item_physical_get_def (IacaValue *vitem, IacaValue *vattr,
+			    IacaValue *vdef)
 {
   IacaItem *item = 0;
   IacaItem *attr = 0;
@@ -1128,8 +1125,7 @@ iaca_item_attribute_physical_get_def (IacaValue *vitem, IacaValue *vattr,
 
 
 static inline IacaValue *
-iaca_item_attribute_get_def (IacaValue *vitem,
-			     IacaValue *vattr, IacaValue *vdef)
+iaca_item_get_def (IacaValue *vitem, IacaValue *vattr, IacaValue *vdef)
 {
   IacaItem *item = 0;
   IacaItem *attr = 0;

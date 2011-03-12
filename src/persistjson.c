@@ -768,7 +768,7 @@ iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
 	g_assert (itattr->v_kind == IACAV_ITEM);
 	if (iaca_dump_item_is_transient (du, itattr))
 	  continue;
-	val = iaca_item_attribute_physical_get ((IacaValue *) itm, vattr);
+	val = iaca_item_physical_get ((IacaValue *) itm, vattr);
 	if (iaca_dump_value_is_transient (du, val))
 	  continue;
 	(void) iaca_dump_queue_item (du, itattr);
@@ -1116,7 +1116,7 @@ iaca_dump_item_content_json (struct iacadumper_st *du, IacaItem *itm)
     json_t *jsentry = NULL;
     if (iaca_dump_item_is_transient (du, (IacaItem *) vitat))
       continue;
-    atval = iaca_item_attribute_physical_get ((IacaValue *) itm, vitat);
+    atval = iaca_item_physical_get ((IacaValue *) itm, vitat);
     if (!atval)
       continue;
     if (atval->v_kind == IACAV_ITEM

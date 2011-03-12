@@ -351,8 +351,8 @@ edit_named_cb (GtkWidget *menu, gpointer data)
 	return;
     }
   widval =
-    iaca_item_attribute_physical_get ((IacaValue *) iacafirst_assocedititm,
-				      (IacaValue *) nameditm);
+    iaca_item_physical_get ((IacaValue *) iacafirst_assocedititm,
+			    (IacaValue *) nameditm);
   wid = GTK_WIDGET (iaca_gobject (widval));
   iaca_debug ("got widval %p wid %p from iacafirst_assocedititm", widval,
 	      wid);
@@ -498,6 +498,11 @@ enum iacanamededitorval_en
   IACANAMEDEDITOR__LAST
 };
 
+#if 0
+/*
+  g_signal_connect (G_OBJECT (txview), "motion-notify-event",
+		    G_CALLBACK (motion_namededitor_view), valtxbuf);
+*/
 static gboolean
 motion_namededitor_view (GtkWidget *widg, GdkEventMotion * ev, gpointer data)
 {
@@ -516,6 +521,7 @@ motion_namededitor_view (GtkWidget *widg, GdkEventMotion * ev, gpointer data)
   /* return true to stop other handlers */
   return FALSE;
 }
+#endif
 
 /* should return a boxed widget */
 static IacaValue *
@@ -535,8 +541,8 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   iaca_debug ("start v1 %p nitm#%lld cloitm %p",
 	      v1, iaca_item_identll (nitm), cloitm);
   nam = iaca_string_val
-    (iaca_item_attribute_physical_get ((IacaValue *) nitm,
-				       (IacaValue *) iacafirst_itname));
+    (iaca_item_physical_get ((IacaValue *) nitm,
+			     (IacaValue *) iacafirst_itname));
   if (nam
       && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, nam)
       != (IacaValue *) nitm)
@@ -562,7 +568,8 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 			      "family", "Andale Mono",
 			      "style", PANGO_STYLE_ITALIC, NULL);
   gtk_text_buffer_create_tag (txbuf, "itemname",
-			      "background", "orange", NULL);
+			      "background", "orange",
+			      "weight", PANGO_WEIGHT_BOLD, NULL);
   gtk_text_buffer_create_tag (txbuf, "itemserial",
 			      "background", "red",
 			      "style", PANGO_STYLE_ITALIC, NULL);
@@ -582,8 +589,6 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   gtk_container_add (GTK_CONTAINER (scrwin), txview);
   res = iacav_gobject_box (G_OBJECT (scrwin));
   valtxbuf = iacav_gobject_box (G_OBJECT (txbuf));
-  g_signal_connect (G_OBJECT (txview), "motion-notify-event",
-		    G_CALLBACK (motion_namededitor_view), valtxbuf);
   iaca_gobject_put_data (res, valtxbuf);
   iaca_debug ("scrwin %p txview %p res %p", scrwin, txview, res);
   itdisplitem =
@@ -605,6 +610,7 @@ enum iacadisplayitemcontentval_en
 {
   IACADISPLAYITEMCONTENT_ITEMREFDISPLAYER,
   IACADISPLAYITEMCONTENT_VALUEDISPLAYER,
+  IACADISPLAYITEMCONTENT_TAGASSOCIATION,
   IACADISPLAYITEMCONTENT__LAST
 };
 
@@ -618,15 +624,15 @@ display_item_cmp (const void *p1, const void *p2)
   if (i1 == i2)
     return 0;
   n1 = iaca_string_val
-    (iaca_item_attribute_physical_get ((IacaValue *) i1,
-				       (IacaValue *) iacafirst_itname));
+    (iaca_item_physical_get ((IacaValue *) i1,
+			     (IacaValue *) iacafirst_itname));
   if (n1
       && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, n1)
       != (IacaValue *) i1)
     n1 = NULL;
   n2 = iaca_string_val
-    (iaca_item_attribute_physical_get ((IacaValue *) i2,
-				       (IacaValue *) iacafirst_itname));
+    (iaca_item_physical_get ((IacaValue *) i2,
+			     (IacaValue *) iacafirst_itname));
   if (n2
       && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, n2)
       != (IacaValue *) i2)
@@ -645,31 +651,6 @@ display_item_cmp (const void *p1, const void *p2)
   return g_strcmp0 (n1, n2);
 }
 
-
-#if 0
-static void
-olsinsert_itemref_txbuf (GtkTextBuffer *txbuf, GtkTextIter *it, IacaItem *itm)
-{
-  const char *nam = 0;
-  GtkTextIter begit = *it;
-  gint begoff = 0;
-  gint endoff = 0;
-  g_assert (GTK_IS_TEXT_BUFFER (txbuf));
-  g_assert (itm != NULL && itm->v_kind == IACAV_ITEM);
-  begoff = gtk_text_iter_get_offset (&begit);
-  nam = iaca_string_val
-    (iaca_item_attribute_physical_get ((IacaValue *) itm,
-				       (IacaValue *) iacafirst_itname));
-  {
-    if (nam)
-      gtk_text_buffer_insert_with_tags_by_name (txbuf, it, nam, -1, "item",
-						NULL);
-  }
-  endoff = gtk_text_iter_get_offset (it);
-  gtk_text_buffer_get_iter_at_offset (txbuf, &begit, begoff);
-#warning insert_itemref_txbuf very incomplete
-}
-#endif
 
 /* display an item, returned value is ignored, v1 is the boxed gtk
    text buffer v2 is the item to display */
@@ -717,8 +698,8 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
       IacaValue *curval = 0;
       if (!curat)
 	continue;
-      curval = iaca_item_attribute_physical_get ((IacaValue *) itd,
-						 (IacaValue *) curat);
+      curval = iaca_item_physical_get ((IacaValue *) itd,
+				       (IacaValue *) curat);
       if (!curval)
 	continue;
       gtk_text_buffer_get_end_iter (txbuf, &endit);
@@ -754,25 +735,63 @@ IACA_DEFINE_CLOFUN (displayitemcontent,
 /// closed values for itemrefdisplayer
 enum iacaitemrefdisplayerval_en
 {
+  IACAITEMREFDISPLAYER_ASSOCITEM,
   IACAITEMREFDISPLAYER__LAST
 };
+
+static gboolean
+iacafirst_item_tag_event (GtkTextTag *tag,
+			  GObject *object,
+			  GdkEvent * event, GtkTextIter *iter, gpointer data)
+{
+  GtkTextView *txview = GTK_TEXT_VIEW (object);
+  IacaItem *itm = (IacaItem *) data;
+  iaca_debug ("tag %p txview %p event %p type %d itm %p #%lld",
+	      tag, txview, event, event ? event->type : GDK_NOTHING,
+	      itm, iaca_item_identll (itm));
+  /* return FALSE to propagate the event to other handlers */
+  return FALSE;
+}
 
 static IacaValue *
 iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
 			    IacaValue *v3off, IacaItem *cloitm)
 {
   IacaValue *res = 0;
+  IacaValue *vass = 0;
   const char *nam = 0;
   long off = iaca_integer_val_def (v3off, -1L);
   GtkTextBuffer *txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
   IacaItem *itm = iacac_item (v2itm);
+  IacaItem *itassoc = iacac_item (iaca_item_pay_load_closure_nth (cloitm,
+								  IACAITEMREFDISPLAYER_ASSOCITEM));
   GtkTextIter txit = { };
+  GtkTextTag *tagit = 0;
   iaca_debug ("off %ld txbuf %p itm %p #%lld",
 	      off, txbuf, itm, iaca_item_identll (itm));
+  if (!itassoc)
+    {
+      itassoc = iaca_item_make (iaca.ia_transientdataspace);
+      iaca_item_pay_load_closure_set_nth
+	(cloitm, IACAITEMREFDISPLAYER_ASSOCITEM, (IacaValue *) itassoc);
+    };
+  vass = iaca_item_physical_get ((IacaValue *) itassoc, (IacaValue *) itm);
+  if (vass)
+    tagit = GTK_TEXT_TAG (iaca_gobject (vass));
+  if (!tagit)
+    {
+      tagit = gtk_text_tag_new (NULL);
+      vass = iacav_gobject_box (G_OBJECT (tagit));
+      iaca_item_physical_put ((IacaValue *) itassoc, (IacaValue *) itm, vass);
+      iaca_debug ("made tagit %p for itm %p #%lld", tagit, itm,
+		  iaca_item_identll (itm));
+      g_signal_connect ((GObject *) tagit, "event",
+			G_CALLBACK (iacafirst_item_tag_event), itm);
+    }
   gtk_text_buffer_get_iter_at_offset (txbuf, &txit, off);
   nam = iaca_string_val
-    (iaca_item_attribute_physical_get ((IacaValue *) itm,
-				       (IacaValue *) iacafirst_itname));
+    (iaca_item_physical_get ((IacaValue *) itm,
+			     (IacaValue *) iacafirst_itname));
   if (nam)
     gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, nam, -1,
 					      "itemname", NULL);
