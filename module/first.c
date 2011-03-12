@@ -705,17 +705,17 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
 	continue;
       gtk_text_buffer_get_end_iter (txbuf, &endit);
       gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
-#define BEGIN_ATTR_DECOR " \342\227\246"	/* ◦ U+25E6 WHITE BULLET */
+#define DECOR_BEGIN_ATTR " \342\227\210 "	/* ◈ U+25C8 WHITE DIAMOND CONTAINING BLACK SMALL DIAMOND */
       gtk_text_buffer_insert_with_tags_by_name
-	(txbuf, &endit, BEGIN_ATTR_DECOR, -1, "decor", NULL);
+	(txbuf, &endit, DECOR_BEGIN_ATTR, -1, "decor", NULL);
       iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
 					       (IacaValue *) curat,
 					       (IacaValue *) NULL,
 					       ititrefdisplayer);
       gtk_text_buffer_get_end_iter (txbuf, &endit);
-#define ATTR_TO_VALUE_DECOR " \342\206\246 "	/* ↦ U+21A6 RIGHTWARDS ARROW FROM BAR */
+#define DECOR_ATTR_TO_VALUE " \342\206\246 "	/* ↦ U+21A6 RIGHTWARDS ARROW FROM BAR */
       gtk_text_buffer_insert_with_tags_by_name
-	(txbuf, &endit, ATTR_TO_VALUE_DECOR, -1, "decor", NULL);
+	(txbuf, &endit, DECOR_ATTR_TO_VALUE, -1, "decor", NULL);
       iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
 					       (IacaValue *) curval,
 					       (IacaValue *) NULL,
@@ -747,18 +747,31 @@ iacafirst_item_tag_event (GtkTextTag *tag,
 {
   GtkTextView *txview = GTK_TEXT_VIEW (object);
   IacaItem *itm = (IacaItem *) data;
-  iaca_debug ("tag %p txview %p ev %p type %d itm %p #%lld",
-	      tag, txview, ev, ev->type, itm, iaca_item_identll (itm));
   switch (ev->type)
     {
     case GDK_MOTION_NOTIFY:
-      iaca_debug ("GDK_MOTION_NOTIFY x=%g y=%g", ev->motion.x, ev->motion.y);
+      iaca_debug ("tag %p itm %p GDK_MOTION_NOTIFY x=%g y=%g",
+		  tag, itm, ev->motion.x, ev->motion.y);
       break;
     case GDK_BUTTON_PRESS:
-      iaca_debug ("GDK_BUTTON_PRESS x=%g y=%g but=%d", ev->button.x,
-		  ev->button.y, ev->button.button);
+      iaca_debug ("tag %p itm %p GDK_BUTTON_PRESS x=%g y=%g but=%d",
+		  tag, itm, ev->button.x, ev->button.y, ev->button.button);
+      break;
+    case GDK_BUTTON_RELEASE:
+      iaca_debug ("tag %p itm %p GDK_BUTTON_RELEASE x=%g y=%g but=%d",
+		  tag, itm, ev->button.x, ev->button.y, ev->button.button);
+      break;
+    case GDK_KEY_PRESS:
+      iaca_debug ("tag %p itm %p GDK_KEY_PRESS keyval=%ud",
+		  tag, itm, ev->key.keyval);
+      break;
+    case GDK_KEY_RELEASE:
+      iaca_debug ("tag %p itm %p GDK_KEY_RELEASE keyval=%ud",
+		  tag, itm, ev->key.keyval);
       break;
     default:
+      iaca_debug ("tag %p txview %p ev %p type %d itm %p #%lld",
+		  tag, txview, ev, ev->type, itm, iaca_item_identll (itm));
       break;
     }
   /* return FALSE to propagate the event to other handlers */
@@ -793,7 +806,8 @@ iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
     tagit = GTK_TEXT_TAG (iaca_gobject (vass));
   if (!tagit)
     {
-      tagit = gtk_text_buffer_create_tag (txbuf, NULL, NULL);
+      tagit = gtk_text_buffer_create_tag
+	(txbuf, NULL, "stretch", PANGO_STRETCH_SEMI_EXPANDED, NULL);
       vass = iacav_gobject_box (G_OBJECT (tagit));
       iaca_item_physical_put ((IacaValue *) itassoc, (IacaValue *) itm, vass);
       iaca_debug ("made tagit %p for itm %p #%lld", tagit, itm,
