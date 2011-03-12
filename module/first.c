@@ -561,7 +561,8 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 			      "foreground", "blue",
 			      "scale", PANGO_SCALE_SMALL,
 			      "style", PANGO_STYLE_ITALIC, NULL);
-  gtk_text_buffer_create_tag (txbuf, "decor", "foreground", "brick", NULL);
+  gtk_text_buffer_create_tag (txbuf, "decor",
+			      "foreground", "firebrick", NULL);
   gtk_text_buffer_create_tag (txbuf, "literal",
 			      "foreground", "darkgreen",
 			      "background", "lightpink",
@@ -762,6 +763,7 @@ iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
   const char *nam = 0;
   long off = iaca_integer_val_def (v3off, -1L);
   GtkTextBuffer *txbuf = GTK_TEXT_BUFFER (iaca_gobject (v1txbuf));
+  GtkTextTagTable *tagtbl = gtk_text_buffer_get_tag_table (txbuf);
   IacaItem *itm = iacac_item (v2itm);
   IacaItem *itassoc = iacac_item (iaca_item_pay_load_closure_nth (cloitm,
 								  IACAITEMREFDISPLAYER_ASSOCITEM));
@@ -780,7 +782,7 @@ iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
     tagit = GTK_TEXT_TAG (iaca_gobject (vass));
   if (!tagit)
     {
-      tagit = gtk_text_tag_new (NULL);
+      tagit = gtk_text_buffer_create_tag (txbuf, NULL, NULL);
       vass = iacav_gobject_box (G_OBJECT (tagit));
       iaca_item_physical_put ((IacaValue *) itassoc, (IacaValue *) itm, vass);
       iaca_debug ("made tagit %p for itm %p #%lld", tagit, itm,
@@ -793,16 +795,20 @@ iacafirst_itemrefdisplayer (IacaValue *v1txbuf, IacaValue *v2itm,
     (iaca_item_physical_get ((IacaValue *) itm,
 			     (IacaValue *) iacafirst_itname));
   if (nam)
-    gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, nam, -1,
-					      "itemname", NULL);
+    gtk_text_buffer_insert_with_tags
+      (txbuf, &txit, nam, -1,
+       tagit, gtk_text_tag_table_lookup (tagtbl, "itemname"), NULL);
   else
     {
       char bufnum[48];
       memset (bufnum, 0, sizeof (bufnum));
       snprintf (bufnum, sizeof (bufnum) - 1, "#%lld",
 		iaca_item_identll (itm));
-      gtk_text_buffer_insert_with_tags_by_name (txbuf, &txit, bufnum, -1,
-						"itemserial", NULL);
+      gtk_text_buffer_insert_with_tags (txbuf, &txit, bufnum, -1,
+					tagit,
+					gtk_text_tag_table_lookup (tagtbl,
+								   "itemserial"),
+					NULL);
     }
   return res;
 }
