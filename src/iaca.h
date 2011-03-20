@@ -623,6 +623,11 @@ static inline IacaValue *iaca_item_get_def (IacaValue *vitem,
 #define iaca_item_get(Vitem,Vattr) \
   iaca_item_get_def((Vitem),(Vattr),(IacaValue*)0)
 
+static inline IacaValue *iaca_item_content_def (IacaValue *vitem,
+						IacaValue *vdef);
+
+#define iaca_item_content(Vitem) iaca_item_content_def ((Vitem),(IacaValue*)0)
+
 /* inside an item vitem put attribute vattr associated to value
    val. Don't do anything if vitem or vattr are not items, or if val
    is null. May grow the table if it was full. */
@@ -1123,6 +1128,16 @@ iaca_item_physical_get_def (IacaValue *vitem, IacaValue *vattr,
   return tbl->at_entab[ix].en_val;
 }
 
+
+static inline IacaValue *
+iaca_item_content_def (IacaValue *vitem, IacaValue *vdef)
+{
+  IacaItem *item = 0;
+  if (!vitem || vitem->v_kind != IACAV_ITEM)
+    return vdef;
+  item = (IacaItem *) vitem;
+  return item->v_itemcontent;
+}
 
 static inline IacaValue *
 iaca_item_get_def (IacaValue *vitem, IacaValue *vattr, IacaValue *vdef)

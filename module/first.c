@@ -523,6 +523,12 @@ motion_namededitor_view (GtkWidget *widg, GdkEventMotion * ev, gpointer data)
 }
 #endif
 
+static void
+txbuf_begin_user_action (GtkTextBuffer *txbuf, gpointer data)
+{
+  iaca_debug ("start txbuf %p", txbuf);
+}
+
 /* should return a boxed widget */
 static IacaValue *
 iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
@@ -574,6 +580,8 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   gtk_text_buffer_create_tag (txbuf, "itemserial",
 			      "background", "red",
 			      "style", PANGO_STYLE_ITALIC, NULL);
+  g_signal_connect ((GObject *) txbuf, "begin-user-action",
+		    G_CALLBACK (txbuf_begin_user_action), nitm);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
   gtk_text_buffer_insert_with_tags_by_name
@@ -656,14 +664,14 @@ display_item_cmp (const void *p1, const void *p2)
 /* display an item, returned value is ignored, v1 is the boxed gtk
    text buffer v2 is the item to display */
 static IacaValue *
-iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
+iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2itd,
 			      IacaItem *cloitm)
 {
   GtkTextBuffer *txbuf = 0;
   GtkTextIter endit = { };
   IacaItem *ititrefdisplayer = 0;
   IacaItem *itvaluedisplayer = 0;
-  IacaItem *itd = iacac_item (v2);
+  IacaItem *itd = iacac_item (v2itd);
   IacaItem **attrs = 0;
   int nbattrs = 0;
   int atcnt = 0;
@@ -708,18 +716,69 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2,
 #define DECOR_BEGIN_ATTR " \342\227\210 "	/* ◈ U+25C8 WHITE DIAMOND CONTAINING BLACK SMALL DIAMOND */
       gtk_text_buffer_insert_with_tags_by_name
 	(txbuf, &endit, DECOR_BEGIN_ATTR, -1, "decor", NULL);
-      iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
-					       (IacaValue *) curat,
-					       (IacaValue *) NULL,
-					       ititrefdisplayer);
+      iaca_item_pay_load_closure_three_values
+	((IacaValue *) v1txbuf,
+	 (IacaValue *) curat, (IacaValue *) NULL, ititrefdisplayer);
       gtk_text_buffer_get_end_iter (txbuf, &endit);
 #define DECOR_ATTR_TO_VALUE " \342\206\246 "	/* ↦ U+21A6 RIGHTWARDS ARROW FROM BAR */
       gtk_text_buffer_insert_with_tags_by_name
 	(txbuf, &endit, DECOR_ATTR_TO_VALUE, -1, "decor", NULL);
-      iaca_item_pay_load_closure_three_values ((IacaValue *) v1txbuf,
-					       (IacaValue *) curval,
-					       (IacaValue *) NULL,
-					       itvaluedisplayer);
+      iaca_item_pay_load_closure_three_values
+	((IacaValue *) v1txbuf,
+	 (IacaValue *) curval, (IacaValue *) NULL, itvaluedisplayer);
+    }
+  gtk_text_buffer_get_end_iter (txbuf, &endit);
+  gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+#define DECOR_ITEM_CONTENT " \342\201\231 "	/* U+2059 FIVE DOT PUNCTUATION ⁙ */
+  gtk_text_buffer_insert_with_tags_by_name
+    (txbuf, &endit, DECOR_ITEM_CONTENT, -1, "decor", NULL);
+  iaca_item_pay_load_closure_three_values
+    ((IacaValue *) v1txbuf,
+     iaca_item_content ((IacaValue *) itd),
+     (IacaValue *) NULL, itvaluedisplayer);
+  gtk_text_buffer_get_end_iter (txbuf, &endit);
+  gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+  switch (iaca_item_pay_load_kind (itd))
+    {
+    case IACAPAYLOAD_DICTIONNARY:
+#define DECOR_DICT_BEGIN " dict\342\246\203"	/* U+2983 LEFT WHITE CURLY BRACKET ⦃ */
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, DECOR_DICT_BEGIN, -1, "decor", NULL);
+      IACA_FOREACH_DICTIONNARY_STRING_LOCAL (itd, strv)
+      {
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+	gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+#define DECOR_DICTENT_BEGIN " \342\201\202 "	/* U+2042 ASTERISM ⁂ */
+	gtk_text_buffer_insert_with_tags_by_name
+	  (txbuf, &endit, DECOR_DICTENT_BEGIN, -1, "decor", NULL);
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+	gtk_text_buffer_insert_with_tags_by_name
+	  (txbuf, &endit, iaca_string_valempty ((IacaValue *) strv), -1,
+	   "literal", NULL);
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+#define DECOR_DICTENT_GIVES " \342\244\217 "	/* U+290F RIGHTWARDS TRIPLE DASH ARROW ⤏ */
+	gtk_text_buffer_insert_with_tags_by_name
+	  (txbuf, &endit, DECOR_DICTENT_GIVES, -1, "decor", NULL);
+	iaca_item_pay_load_closure_three_values
+	  ((IacaValue *) v1txbuf,
+	   (IacaValue *) iaca_item_pay_load_dictionnary_get
+	   (itd,
+	    iaca_string_val ((IacaValue *) strv)),
+	   (IacaValue *) NULL, itvaluedisplayer);
+      }
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+      gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+#define DECOR_DICT_END " \342\246\204"	/* U+2984 RIGHT WHITE CURLY BRACKET ⦄ */
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, DECOR_DICT_END, -1, "decor", NULL);
+      break;
+    case IACAPAYLOAD_BUFFER:
+    case IACAPAYLOAD_VECTOR:
+    case IACAPAYLOAD_QUEUE:
+    case IACAPAYLOAD_CLOSURE:
+    case IACAPAYLOAD__NONE:
+      break;
     }
   iaca_warning ("iacafirst_displayitemcontent not fully implemented");
 #warning iacafirst_displayitemcontent not fully implemented
@@ -746,28 +805,45 @@ iacafirst_item_tag_event (GtkTextTag *tag,
 			  GdkEvent *ev, GtkTextIter *iter, gpointer data)
 {
   GtkTextView *txview = GTK_TEXT_VIEW (object);
+  GtkTextMark *insmk = 0;
   IacaItem *itm = (IacaItem *) data;
-  switch (ev->type)
+  GtkTextBuffer *txbuf = gtk_text_view_get_buffer (txview);
+  GtkTextIter txit = { };
+  if (ev->type == GDK_MOTION_NOTIFY)
     {
-    case GDK_MOTION_NOTIFY:
       iaca_debug ("tag %p itm %p GDK_MOTION_NOTIFY x=%g y=%g",
 		  tag, itm, ev->motion.x, ev->motion.y);
-      break;
+      return FALSE;
+    };
+  insmk = gtk_text_buffer_get_insert (txbuf);
+  gtk_text_buffer_get_iter_at_mark (txbuf, &txit, insmk);
+  switch (ev->type)
+    {
     case GDK_BUTTON_PRESS:
-      iaca_debug ("tag %p itm %p GDK_BUTTON_PRESS x=%g y=%g but=%d",
-		  tag, itm, ev->button.x, ev->button.y, ev->button.button);
+      iaca_debug
+	("tag %p itm %p GDK_BUTTON_PRESS x=%g y=%g but=%d insert L%d,C%d",
+	 tag, itm, ev->button.x, ev->button.y, ev->button.button,
+	 gtk_text_iter_get_line (&txit),
+	 gtk_text_iter_get_line_offset (&txit));
       break;
     case GDK_BUTTON_RELEASE:
-      iaca_debug ("tag %p itm %p GDK_BUTTON_RELEASE x=%g y=%g but=%d",
-		  tag, itm, ev->button.x, ev->button.y, ev->button.button);
+      iaca_debug
+	("tag %p itm %p GDK_BUTTON_RELEASE x=%g y=%g but=%d insert L%d,C%d",
+	 tag, itm, ev->button.x, ev->button.y, ev->button.button,
+	 gtk_text_iter_get_line (&txit),
+	 gtk_text_iter_get_line_offset (&txit));
       break;
     case GDK_KEY_PRESS:
-      iaca_debug ("tag %p itm %p GDK_KEY_PRESS keyval=%ud",
-		  tag, itm, ev->key.keyval);
+      iaca_debug ("tag %p itm %p GDK_KEY_PRESS keyval=%ud insert L%d,C%d",
+		  tag, itm, ev->key.keyval,
+		  gtk_text_iter_get_line (&txit),
+		  gtk_text_iter_get_line_offset (&txit));
       break;
     case GDK_KEY_RELEASE:
-      iaca_debug ("tag %p itm %p GDK_KEY_RELEASE keyval=%ud",
-		  tag, itm, ev->key.keyval);
+      iaca_debug ("tag %p itm %p GDK_KEY_RELEASE keyval=%ud insert L%d,C%d",
+		  tag, itm, ev->key.keyval,
+		  gtk_text_iter_get_line (&txit),
+		  gtk_text_iter_get_line_offset (&txit));
       break;
     default:
       iaca_debug ("tag %p txview %p ev %p type %d itm %p #%lld",
