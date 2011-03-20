@@ -774,7 +774,77 @@ iacafirst_displayitemcontent (IacaValue *v1txbuf, IacaValue *v2itd,
 	(txbuf, &endit, DECOR_DICT_END, -1, "decor", NULL);
       break;
     case IACAPAYLOAD_BUFFER:
+#define DECOR_BUFFER_BEGIN " buf\342\200\234"	/* U+201C LEFT DOUBLE QUOTATION MARK “ */
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, DECOR_BUFFER_BEGIN, -1, "decor", NULL);
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit,
+	 iaca_item_pay_load_buffer_str (itd),
+	 iaca_item_pay_load_buffer_length (itd), "literal", NULL);
+      gtk_text_buffer_get_end_iter (txbuf, &endit);
+#define DECOR_BUFFER_END "\342\200\235 "	/* U+201D RIGHT DOUBLE QUOTATION MARK ” */
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, DECOR_BUFFER_END, -1, "decor", NULL);
+      break;
     case IACAPAYLOAD_VECTOR:
+      {
+	IacaValue *comp = 0;
+	char decorbuf[48];
+	memset (decorbuf, 0, sizeof (decorbuf));
+	int veclen = iaca_item_pay_load_vector_length (itd);
+#define DECOR_VECTOR_BEGIN_FMT " buf%d\342\214\234"	/* U+231C TOP LEFT CORNER ⌜ */
+	snprintf (decorbuf, sizeof (decorbuf) - 1, DECOR_VECTOR_BEGIN_FMT,
+		  veclen);
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+	gtk_text_buffer_insert_with_tags_by_name
+	  (txbuf, &endit, decorbuf, -1, "decor", NULL);
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+	for (int ix = 0; ix < veclen; ix++)
+	  {
+	    comp = iaca_item_pay_load_nth_vector (itd, ix);
+	    if (ix % 5 == 0)
+	      {
+		char ixbuf[16];
+		char subbuf[8];
+		memset (ixbuf, 0, sizeof (ixbuf));
+		memset (subbuf, 0, sizeof (subbuf));
+		snprintf (ixbuf, sizeof (ixbuf) - 1, "%d", ix);
+		memset (decorbuf, 0, sizeof (decorbuf));
+		strcpy (decorbuf, "  ");
+		for (const char *dgp = ixbuf; *dgp; dgp++)
+		  {
+		    if (strlen (decorbuf) + 5 < sizeof (decorbuf))
+		      {
+			strcpy (subbuf, "\342\202\200"	/* U+2080 SUBSCRIPT ZERO ₀ */
+			  );
+			subbuf[2] += (*dgp - '0');
+			strcat (decorbuf, subbuf);
+		      };
+		  }
+		strcat (decorbuf, " ");
+		gtk_text_buffer_insert_with_tags_by_name
+		  (txbuf, &endit, decorbuf, -1, "decor", NULL);
+	      }
+	    else
+	      gtk_text_buffer_insert (txbuf, &endit, " ", 1);
+	    gtk_text_buffer_get_end_iter (txbuf, &endit);
+	    iaca_item_pay_load_closure_three_values
+	      ((IacaValue *) v1txbuf,
+	       comp, (IacaValue *) NULL, itvaluedisplayer);
+	    if ((ix + 1) % 10 == 0 && ix + 1 < veclen)
+	      {
+		gtk_text_buffer_get_end_iter (txbuf, &endit);
+		gtk_text_buffer_insert (txbuf, &endit, "\n", 1);
+	      }
+	  }
+	gtk_text_buffer_get_end_iter (txbuf, &endit);
+#define DECOR_VECTOR_END "\342\214\237"	/* U+231F BOTTOM RIGHT CORNER ⌟ */
+	gtk_text_buffer_insert_with_tags_by_name
+	  (txbuf, &endit, DECOR_VECTOR_END, -1, "decor", NULL);
+      }
+      break;
     case IACAPAYLOAD_QUEUE:
     case IACAPAYLOAD_CLOSURE:
     case IACAPAYLOAD__NONE:
