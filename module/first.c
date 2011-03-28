@@ -529,6 +529,17 @@ txbuf_begin_user_action (GtkTextBuffer *txbuf, gpointer data)
   iaca_debug ("start txbuf %p", txbuf);
 }
 
+
+/* called with a different menu every time the menu is displayed */
+static void
+iaca_itemtxview_populate_popup_cb (GtkTextView *txview, GtkMenu * menu,
+				   gpointer data)
+{
+  IacaItem *nitm = (IacaItem *) data;
+  iaca_debug ("txview %p menu %p nitm %p #%lld",
+	      txview, menu, nitm, iaca_item_identll (nitm));
+}
+
 /* should return a boxed widget */
 static IacaValue *
 iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
@@ -592,6 +603,9 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
     (txbuf, &endit, cbuf, -1, "title", "id", NULL);
   txview = gtk_text_view_new_with_buffer (txbuf);
   gtk_text_view_set_editable (GTK_TEXT_VIEW (txview), FALSE);
+  g_signal_connect ((GObject *) txview, "populate-popup",
+		    G_CALLBACK (iaca_itemtxview_populate_popup_cb),
+		    (gpointer) nitm);
   scrwin = gtk_scrolled_window_new (NULL, NULL);
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrwin),
 				  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
