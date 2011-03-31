@@ -392,7 +392,20 @@ edit_named_cb (GtkWidget *menu, gpointer data)
       (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), pagenum);
 }				/* end edit_named_cb */
 
+static void
+entry_changed_cb (GtkEditable * ed, gpointer data)
+{
+  GtkEntry *ent = GTK_ENTRY (ed);
+  iaca_debug ("ent %p data %p ent.txt %s", ent, data,
+	      gtk_entry_get_text (ent));
+}
 
+static void
+entry_activate_cb (GtkEntry * ent, gpointer data)
+{
+  iaca_debug ("ent %p data %p ent.txt %s", ent, data,
+	      gtk_entry_get_text (ent));
+}
 
 static void
 iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
@@ -474,6 +487,9 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
     gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 2);
     entry = gtk_entry_new ();
     iacafirst_valentry = iacav_gobject_box (G_OBJECT (entry));
+    g_signal_connect (entry, "changed", G_CALLBACK (entry_changed_cb), NULL);
+    g_signal_connect (entry, "activate",
+		      G_CALLBACK (entry_activate_cb), NULL);
     gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
     update_completion_entry_topdict ();
   }
@@ -529,15 +545,38 @@ txbuf_begin_user_action (GtkTextBuffer *txbuf, gpointer data)
   iaca_debug ("start txbuf %p", txbuf);
 }
 
+static void
+txbuf_end_user_action (GtkTextBuffer *txbuf, gpointer data)
+{
+  iaca_debug ("start txbuf %p", txbuf);
+}
+
+static void
+txbuf_insert_text (GtkTextBuffer *txbuf, GtkTextIter *it, gchar *txt,
+		   gint len, gpointer data)
+{
+  iaca_debug ("start txbuf %p it L%dC%d txt '%s' l%d", txbuf,
+	      gtk_text_iter_get_line (it), gtk_text_iter_get_line_offset (it),
+	      txt, len);
+}
 
 /* called with a different menu every time the menu is displayed */
 static void
-iaca_itemtxview_populate_popup_cb (GtkTextView *txview, GtkMenu * menu,
+iaca_itemtxview_populate_popup_cb (GtkTextView *txview, GtkMenu *menu,
 				   gpointer data)
 {
   IacaItem *nitm = (IacaItem *) data;
   iaca_debug ("txview %p menu %p nitm %p #%lld",
 	      txview, menu, nitm, iaca_item_identll (nitm));
+}
+
+static void
+iaca_itemtxview_insert_at_cursor_cb (GtkTextView *txview, gchar *str,
+				     gpointer data)
+{
+  IacaItem *nitm = (IacaItem *) data;
+  iaca_debug ("txview %p str '%s' nitm %p #%lld",
+	      txview, str, nitm, iaca_item_identll (nitm));
 }
 
 /* should return a boxed widget */
@@ -593,6 +632,10 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
 			      "style", PANGO_STYLE_ITALIC, NULL);
   g_signal_connect ((GObject *) txbuf, "begin-user-action",
 		    G_CALLBACK (txbuf_begin_user_action), nitm);
+  g_signal_connect ((GObject *) txbuf, "insert-text",
+		    G_CALLBACK (txbuf_insert_text), nitm);
+  g_signal_connect ((GObject *) txbuf, "end-user-action",
+		    G_CALLBACK (txbuf_end_user_action), nitm);
   iaca_debug ("txbuf %p", txbuf);
   gtk_text_buffer_get_end_iter (txbuf, &endit);
   gtk_text_buffer_insert_with_tags_by_name
@@ -605,6 +648,9 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   gtk_text_view_set_editable (GTK_TEXT_VIEW (txview), FALSE);
   g_signal_connect ((GObject *) txview, "populate-popup",
 		    G_CALLBACK (iaca_itemtxview_populate_popup_cb),
+		    (gpointer) nitm);
+  g_signal_connect ((GObject *) txview, "insert-at-cursor",
+		    G_CALLBACK (iaca_itemtxview_insert_at_cursor_cb),
 		    (gpointer) nitm);
   scrwin = gtk_scrolled_window_new (NULL, NULL);
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrwin),

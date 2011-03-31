@@ -1491,7 +1491,7 @@ iaca_set_first_element (IacaValue *vset)
 static inline IacaValue *
 iaca_set_after_element (IacaValue *vset, IacaValue *velem)
 {
-  int lo = 0, hi = 0, md = 0, last = 0;
+  int lo = 0, hi = 0, md = 0;
   int64_t id = 0;
   IacaSet *set = 0;
   IacaItem *item = 0;
@@ -1503,7 +1503,7 @@ iaca_set_after_element (IacaValue *vset, IacaValue *velem)
   item = (IacaItem *) velem;
   id = item->v_ident;
   lo = 0;
-  last = hi = (int) (set->v_cardinal) - 1;
+  hi = (int) (set->v_cardinal) - 1;
   while (lo + 1 < hi)
     {
       IacaItem *curitem = 0;
