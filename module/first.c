@@ -29,6 +29,8 @@ static IacaValue *iacafirst_valwin;
 static IacaValue *iacafirst_valnotebook;
 /* the boxed gobject value for the top entry */
 static IacaValue *iacafirst_valentry;
+/* the boxed gobject value for the status bar */
+static IacaValue *iacafirst_valstatbar;
 
 /* the 'name' item */
 static IacaItem *iacafirst_itname;
@@ -392,13 +394,6 @@ edit_named_cb (GtkWidget *menu, gpointer data)
       (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), pagenum);
 }				/* end edit_named_cb */
 
-static void
-entry_changed_cb (GtkEditable * ed, gpointer data)
-{
-  GtkEntry *ent = GTK_ENTRY (ed);
-  iaca_debug ("ent %p data %p ent.txt %s", ent, data,
-	      gtk_entry_get_text (ent));
-}
 
 static void
 entry_activate_cb (GtkEntry * ent, gpointer data)
@@ -487,7 +482,8 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
     gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 2);
     entry = gtk_entry_new ();
     iacafirst_valentry = iacav_gobject_box (G_OBJECT (entry));
-    g_signal_connect (entry, "changed", G_CALLBACK (entry_changed_cb), NULL);
+    /* don't connect to "change" signal on entry, it gets every single
+       char typed! */
     g_signal_connect (entry, "activate",
 		      G_CALLBACK (entry_activate_cb), NULL);
     gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
@@ -498,6 +494,12 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   iacafirst_valnotebook = iacav_gobject_box (G_OBJECT (notebook));
   iacafirst_assocedititm = iaca_item_make (iaca.ia_transientdataspace);
   gtk_box_pack_start (GTK_BOX (box), notebook, TRUE, TRUE, 2);
+  //// create the statusbar 
+  {
+    GtkStatusbar *statbar = gtk_statusbar_new ();
+    gtk_box_pack_start (GTK_BOX (box), statbar, FALSE, FALSE, 2);
+    iacafirst_valstatbar = iacav_gobject_box (G_OBJECT (statbar));
+  }
   ////
   gtk_window_set_application (win, app);
   gtk_widget_show_all (GTK_WIDGET (win));
