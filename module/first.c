@@ -60,6 +60,27 @@ iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
 		    (gpointer) itactivapp);
 }
 
+static void
+bad_entry_name_dialog (const char *txt)
+{
+  GtkWidget *dial = 0;
+  GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
+  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
+  int resp = 0;
+  dial = gtk_message_dialog_new_with_markup
+    (win,
+     GTK_DIALOG_DESTROY_WITH_PARENT,
+     GTK_MESSAGE_WARNING,
+     GTK_BUTTONS_OK, "<b>invalid name</b> <tt>%s</tt>", txt);
+  gtk_message_dialog_format_secondary_markup
+    (GTK_MESSAGE_DIALOG (dial),
+     "A name should contain only <i>letters</i> or underscores <tt>_</tt>");
+  gtk_widget_show_all (GTK_WIDGET (dial));
+  resp = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("resp %d", resp);
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+  gtk_entry_set_text (entry, "");
+}
 
 /* update the completion of the main entry widget for the toplevel
    dictionnary; should be called initially and at every change to the
@@ -271,87 +292,12 @@ IACA_DEFINE_CLOFUN (gtkapplinit,
 		    IACAGTKINITVAL__LAST, gobject_do, iacafirst_gtkinit);
 
 static void
-edit_named_cb (GtkWidget *menu, gpointer data)
+edit_named_item (const char *txt, IacaItem *nameditm,
+		 IacaItem *namededitoritm)
 {
-  GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
-  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
-  GtkWidget *dial = 0;
-  IacaItem *namededitoritm = data;
   IacaValue *widval = 0;
   GtkWidget *wid = 0;
-  const gchar *txt = 0;
-  const gchar *endtxt = 0;
-  IacaItem *nameditm = 0;
-  bool goodname = 0;
-  int pagenum = -1;
-  int resp = 0;
-  g_assert (GTK_IS_ENTRY (entry));
-  g_assert (GTK_IS_WINDOW (win));
-  g_assert (namededitoritm && namededitoritm->v_kind == IACAV_ITEM);
-  txt = gtk_entry_get_text (entry);
-  iaca_debug ("txt '%s'", txt);
-  if (!g_utf8_validate (txt, -1, &endtxt))
-    iaca_error ("invalid UTF8 entry text '%s'", txt);
-  goodname = endtxt > txt;
-  for (const gchar *p = txt; p < endtxt && goodname; p = g_utf8_next_char (p))
-    {
-      gunichar c = g_utf8_get_char (p);
-      goodname = g_unichar_isalpha (c) || c == '_';
-    }
-  iaca_debug ("text is %s", goodname ? "good name" : "bad");
-  if (!goodname)
-    {
-      dial = gtk_message_dialog_new_with_markup
-	(win,
-	 GTK_DIALOG_DESTROY_WITH_PARENT,
-	 GTK_MESSAGE_WARNING,
-	 GTK_BUTTONS_OK, "<b>invalid name</b> <tt>%s</tt>", txt);
-      gtk_message_dialog_format_secondary_markup
-	(GTK_MESSAGE_DIALOG (dial),
-	 "A name should contain only <i>letters</i> or underscores <tt>_</tt>");
-      gtk_widget_show_all (GTK_WIDGET (dial));
-      resp = gtk_dialog_run (GTK_DIALOG (dial));
-      iaca_debug ("resp %d", resp);
-      gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
-      gtk_entry_set_text (entry, "");
-      return;
-    }
-  nameditm = iacac_item (iaca_item_pay_load_dictionnary_get
-			 (iaca.ia_topdictitm, txt));
-  iaca_debug ("nameditm %p #%lld", nameditm, iaca_item_identll (nameditm));
-  if (!nameditm)
-    {
-      dial = gtk_message_dialog_new_with_markup
-	(win,
-	 GTK_DIALOG_DESTROY_WITH_PARENT,
-	 GTK_MESSAGE_QUESTION,
-	 GTK_BUTTONS_OK_CANCEL,
-	 "<b>Create new item</b> named <tt>%s</tt> ?", txt);
-      gtk_message_dialog_format_secondary_markup
-	(GTK_MESSAGE_DIALOG (dial),
-	 "<i>ok</i> to create then edit a new named item,\n"
-	 "<i>cancel</i> to continue without changes.");
-      gtk_widget_show_all (GTK_WIDGET (dial));
-      resp = gtk_dialog_run (GTK_DIALOG (dial));
-      iaca_debug ("resp %d", resp);
-      if (resp == GTK_RESPONSE_OK)
-	{
-	  nameditm = iaca_item_make (iacafirst_dsp);
-	  iaca_item_physical_put ((IacaValue *) nameditm,
-				  (IacaValue *) iacafirst_itname,
-				  iacav_string_make (txt));
-	  iaca_item_pay_load_put_dictionnary_str
-	    (iaca.ia_topdictitm, txt, (IacaValue *) nameditm);
-	  iaca_debug ("created named '%s' %p #%lld",
-		      txt, nameditm, iaca_item_identll (nameditm));
-	  update_completion_entry_topdict ();
-	}
-      else
-	nameditm = 0;
-      gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
-      if (!nameditm)
-	return;
-    }
+  int pagenum = 0;
   widval =
     iaca_item_physical_get ((IacaValue *) iacafirst_assocedititm,
 			    (IacaValue *) nameditm);
@@ -392,14 +338,139 @@ edit_named_cb (GtkWidget *menu, gpointer data)
   if (pagenum >= 0)
     gtk_notebook_set_current_page
       (GTK_NOTEBOOK (iaca_gobject (iacafirst_valnotebook)), pagenum);
+}
+
+static void
+make_new_item_dialog (const char *txt, IacaItem *namededitoritm)
+{
+  GtkWidget *dial = 0;
+  IacaItem *nameditm = 0;
+  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
+  int resp = 0;
+  dial = gtk_message_dialog_new_with_markup
+    (win,
+     GTK_DIALOG_DESTROY_WITH_PARENT,
+     GTK_MESSAGE_QUESTION,
+     GTK_BUTTONS_OK_CANCEL,
+     "<b>Create new item</b> named <tt>%s</tt> ?", txt);
+  gtk_message_dialog_format_secondary_markup
+    (GTK_MESSAGE_DIALOG (dial),
+     "<i>ok</i> to create then edit a new named item,\n"
+     "<i>cancel</i> to continue without changes.");
+  gtk_widget_show_all (GTK_WIDGET (dial));
+  resp = gtk_dialog_run (GTK_DIALOG (dial));
+  iaca_debug ("resp %d", resp);
+  if (resp == GTK_RESPONSE_OK)
+    {
+      nameditm = iaca_item_make (iacafirst_dsp);
+      iaca_item_physical_put ((IacaValue *) nameditm,
+			      (IacaValue *) iacafirst_itname,
+			      iacav_string_make (txt));
+      iaca_item_pay_load_put_dictionnary_str
+	(iaca.ia_topdictitm, txt, (IacaValue *) nameditm);
+      iaca_debug ("created named '%s' %p #%lld",
+		  txt, nameditm, iaca_item_identll (nameditm));
+      update_completion_entry_topdict ();
+      edit_named_item (txt, nameditm, namededitoritm);
+    }
+  else
+    nameditm = 0;
+  gtk_widget_destroy (GTK_WIDGET (dial)), dial = 0;
+}
+
+static void
+edit_named_cb (GtkWidget *menu, gpointer data)
+{
+  GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
+  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
+  IacaItem *namededitoritm = data;
+  const gchar *txt = 0;
+  const gchar *endtxt = 0;
+  IacaItem *nameditm = 0;
+  bool goodname = 0;
+  g_assert (GTK_IS_ENTRY (entry));
+  g_assert (GTK_IS_WINDOW (win));
+  g_assert (namededitoritm && namededitoritm->v_kind == IACAV_ITEM);
+  txt = gtk_entry_get_text (entry);
+  iaca_debug ("txt '%s'", txt);
+  if (!g_utf8_validate (txt, -1, &endtxt))
+    iaca_error ("invalid UTF8 entry text '%s'", txt);
+  goodname = endtxt > txt;
+  for (const gchar *p = txt; p < endtxt && goodname; p = g_utf8_next_char (p))
+    {
+      gunichar c = g_utf8_get_char (p);
+      goodname = g_unichar_isalpha (c) || c == '_';
+    }
+  iaca_debug ("text is %s", goodname ? "good name" : "bad");
+  if (!goodname)
+    {
+      bad_entry_name_dialog (txt);
+      return;
+    }
+  nameditm = iacac_item (iaca_item_pay_load_dictionnary_get
+			 (iaca.ia_topdictitm, txt));
+  iaca_debug ("nameditm %p #%lld", nameditm, iaca_item_identll (nameditm));
+  if (!nameditm)
+    make_new_item_dialog (txt, namededitoritm);
+  else
+    edit_named_item (txt, nameditm, namededitoritm);
 }				/* end edit_named_cb */
 
 
 static void
 entry_activate_cb (GtkEntry * ent, gpointer data)
 {
-  iaca_debug ("ent %p data %p ent.txt %s", ent, data,
-	      gtk_entry_get_text (ent));
+  GtkWidget *dial = 0;
+  const char *entxt = gtk_entry_get_text (ent);
+  GtkWindow *win = GTK_WINDOW (iaca_gobject (iacafirst_valwin));
+  IacaItem *namededitoritm = data;
+  const gchar *endtxt = 0;
+  IacaItem *nameditm = 0;
+  int resp = 0;
+  bool goodname = 0;
+  iaca_debug ("ent %p data %p ent.txt %s", ent, data, entxt);
+  g_assert (namededitoritm && namededitoritm->v_kind == IACAV_ITEM);
+  if (!g_utf8_validate (entxt, -1, &endtxt))
+    iaca_error ("invalid UTF8 entry text '%s'", entxt);
+  goodname = endtxt > entxt;
+  for (const gchar *p = entxt;
+       p < endtxt && goodname; p = g_utf8_next_char (p))
+    {
+      gunichar c = g_utf8_get_char (p);
+      goodname = g_unichar_isalpha (c) || c == '_';
+    }
+  nameditm = iacac_item (iaca_item_pay_load_dictionnary_get
+			 (iaca.ia_topdictitm, entxt));
+  if (nameditm)
+    {
+      dial = gtk_message_dialog_new_with_markup
+	(win,
+	 GTK_DIALOG_DESTROY_WITH_PARENT,
+	 GTK_MESSAGE_QUESTION,
+	 GTK_BUTTONS_OK_CANCEL,
+	 "<b>Edit item</b> #%lld named <tt>%s</tt> ?",
+	 iaca_item_identll (nameditm), entxt);
+      gtk_message_dialog_format_secondary_markup
+	(GTK_MESSAGE_DIALOG (dial),
+	 "<i>ok</i> to edit the item,\n"
+	 "<i>cancel</i> to continue without changes.");
+      gtk_widget_show_all (GTK_WIDGET (dial));
+      resp = gtk_dialog_run (GTK_DIALOG (dial));
+      iaca_debug ("resp %d", resp);
+      if (resp == GTK_RESPONSE_OK)
+	{
+	  edit_named_item (entxt, nameditm, namededitoritm);
+	}
+      gtk_widget_destroy (GTK_WIDGET (dial));
+    }
+  else if (goodname)
+    {
+      make_new_item_dialog (entxt, namededitoritm);
+    }
+  else
+    {				/* bad name */
+      bad_entry_name_dialog (entxt);
+    }
 }
 
 static void
@@ -485,7 +556,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
     /* don't connect to "change" signal on entry, it gets every single
        char typed! */
     g_signal_connect (entry, "activate",
-		      G_CALLBACK (entry_activate_cb), NULL);
+		      G_CALLBACK (entry_activate_cb), namededitoritm);
     gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 2);
     update_completion_entry_topdict ();
   }
@@ -497,7 +568,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   //// create the statusbar 
   {
     GtkStatusbar *statbar = gtk_statusbar_new ();
-    gtk_box_pack_start (GTK_BOX (box), statbar, FALSE, FALSE, 2);
+    gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET (statbar), FALSE, FALSE, 2);
     iacafirst_valstatbar = iacav_gobject_box (G_OBJECT (statbar));
   }
   ////
