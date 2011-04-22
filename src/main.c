@@ -1603,11 +1603,15 @@ iaca_initialize_modules (void)
     }
 }
 
+static int iaca_want_dump;
+
 static GOptionEntry iaca_options[] = {
   {"state-dir", 'S', 0, G_OPTION_ARG_FILENAME, &iaca.ia_statedir,
    "state directory with data and code", "STATEDIR"},
   {"debug", 'D', 0, G_OPTION_ARG_NONE, (gpointer) & iaca.ia_debug,
    "debug message", NULL},
+  {"write", 'W', 0, G_OPTION_ARG_NONE, (gpointer) & iaca_want_dump,
+   "write state", NULL},
   {"xtramodule", 'X', 0, G_OPTION_ARG_CALLBACK, (gpointer) iaca_xtra_module,
    "extra module to load", "XTRAMODULE"},
   {NULL}
@@ -1655,6 +1659,13 @@ main (int argc, char **argv)
   iaca_debug ("ia_gtkinititm %p #%lld", iaca.ia_gtkinititm,
 	      (long long) (iaca.ia_gtkinititm ? iaca.
 			   ia_gtkinititm->v_ident : 0LL));
+  if (iaca_want_dump) 
+    {
+      iaca_warning ("before forced dump");
+      iaca_dump (NULL);
+      iaca_warning ("after forced dump");
+      return 0;
+    }
   if (iaca.ia_gtkinititm)
     {
       if (iaca.ia_gtkinititm->v_kind != IACAV_ITEM

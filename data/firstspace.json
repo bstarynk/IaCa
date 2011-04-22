@@ -6,7 +6,7 @@
    "item": 1,
    "itemattrs": [
     {
-     "atid": 4,
+     "atid": 3,
      "val": {
       "kd": "strv",
       "str": "the_dictionnary"
@@ -17,7 +17,7 @@
    "itempayload": {
     "payloaddictionnary": {
      "name": {
-      "id": 4,
+      "id": 3,
       "kd": "itrv"
      },
      "the_dictionnary": {
@@ -37,21 +37,6 @@
     "payloadclofun": "gtkapplinit",
     "payloadcloval": [
      {
-      "id": 3,
-      "kd": "itrv"
-     }
-    ],
-    "payloadkind": "closure"
-   }
-  },
-  {
-   "item": 3,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "activateapplication",
-    "payloadcloval": [
-     {
       "id": 5,
       "kd": "itrv"
      }
@@ -60,10 +45,10 @@
    }
   },
   {
-   "item": 4,
+   "item": 3,
    "itemattrs": [
     {
-     "atid": 4,
+     "atid": 3,
      "val": {
       "kd": "strv",
       "str": "name"
@@ -78,57 +63,8 @@
    "itemattrs": [],
    "itemcontent": null,
    "itempayload": {
-    "payloadclofun": "namededitor",
-    "payloadcloval": [
-     {
-      "id": 6,
-      "kd": "itrv"
-     }
-    ],
-    "payloadkind": "closure"
-   }
-  },
-  {
-   "item": 6,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "displayitemcontent",
-    "payloadcloval": [
-     {
-      "id": 7,
-      "kd": "itrv"
-     },
-     {
-      "id": 8,
-      "kd": "itrv"
-     }
-    ],
-    "payloadkind": "closure"
-   }
-  },
-  {
-   "item": 7,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "itemrefdisplayer",
+    "payloadclofun": "activateapplication",
     "payloadcloval": [],
-    "payloadkind": "closure"
-   }
-  },
-  {
-   "item": 8,
-   "itemattrs": [],
-   "itemcontent": null,
-   "itempayload": {
-    "payloadclofun": "valuedisplayer",
-    "payloadcloval": [
-     {
-      "id": 7,
-      "kd": "itrv"
-     }
-    ],
     "payloadkind": "closure"
    }
   }
