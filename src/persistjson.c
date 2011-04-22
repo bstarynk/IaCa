@@ -740,6 +740,8 @@ iaca_dump_value_is_transient (struct iacadumper_st *du, IacaValue *val)
       return false;
     case IACAV_NODE:
       return iaca_dump_item_is_transient (du, ((IacaNode *) val)->v_conn);
+    case IACAV_TRANSNODE:
+      return true;
     case IACAV_GOBJECT:
     default:
       return true;
@@ -877,6 +879,8 @@ scanagain:
 	  }
 	return;
       }
+    case IACAV_TRANSNODE:
+      return;
     case IACAV_SET:
       {
 	IacaSet *set = (IacaSet *) val;
@@ -941,6 +945,8 @@ iaca_dump_value_json (struct iacadumper_st *du, IacaValue *val)
 	json_object_set (js, "sons", jsarrson);
 	return js;
       }
+    case IACAV_TRANSNODE:
+      return json_null ();
     case IACAV_SET:
       {
 	IacaSet *set = (IacaSet *) val;

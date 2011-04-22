@@ -41,6 +41,24 @@ iaca_node_make (IacaValue *conn, IacaValue *sontab[], unsigned arity)
 }
 
 IacaNode *
+iaca_transnode_make (IacaValue *conn, IacaValue *sontab[], unsigned arity)
+{
+  IacaNode *n = 0;
+  size_t sz = 0;
+  if (!conn || conn->v_kind != IACAV_ITEM)
+    return NULL;
+  g_assert (arity < IACA_ARITY_MAX);
+  sz = sizeof (IacaNode) + (arity + 1) * sizeof (IacaValue *);
+  n = iaca_alloc_data (sz);
+  n->v_kind = IACAV_TRANSNODE;
+  n->v_arity = arity;
+  n->v_conn = (IacaItem *) conn;
+  if (sontab)
+    memcpy (n->v_sons, sontab, arity * sizeof (IacaValue *));
+  return n;
+}
+
+IacaNode *
 iaca_node_makevarf (IacaValue *conn, ...)
 {
   IacaNode *n = 0;
@@ -57,6 +75,32 @@ iaca_node_makevarf (IacaValue *conn, ...)
   sz = sizeof (IacaNode) + (ar + 1) * sizeof (IacaValue *);
   n = iaca_alloc_data (sz);
   n->v_kind = IACAV_NODE;
+  n->v_arity = ar;
+  n->v_conn = (IacaItem *) conn;
+  va_start (arglist, conn);
+  for (unsigned ix = 0; ix < ar; ix++)
+    n->v_sons[ix] = va_arg (arglist, IacaValue *);
+  va_end (arglist);
+  return n;
+}
+
+IacaNode *
+iaca_transnode_makevarf (IacaValue *conn, ...)
+{
+  IacaNode *n = 0;
+  size_t sz = 0;
+  unsigned ar = 0;
+  va_list arglist;
+  if (!conn || conn->v_kind != IACAV_ITEM)
+    return NULL;
+  va_start (arglist, conn);
+  while (va_arg (arglist, IacaValue *) != NULL)
+      ar++;
+  va_end (arglist);
+  g_assert (ar < IACA_ARITY_MAX);
+  sz = sizeof (IacaNode) + (ar + 1) * sizeof (IacaValue *);
+  n = iaca_alloc_data (sz);
+  n->v_kind = IACAV_TRANSNODE;
   n->v_arity = ar;
   n->v_conn = (IacaItem *) conn;
   va_start (arglist, conn);
@@ -1505,6 +1549,8 @@ iaca_copy (IacaValue *v)
 	  ((IacaNode *) res)->v_sons[ix] = iaca_copy (n->v_sons[ix]);
 	return res;
       }
+    case IACAV_TRANSNODE:
+      return NULL;
     default:
       iaca_error ("unexpected kind %d to copy %p", v->v_kind, v);
       return NULL;

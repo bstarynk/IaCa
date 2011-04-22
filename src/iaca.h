@@ -111,6 +111,7 @@ enum iacavaluekind_en
   IACAV_INTEGER,		/* boxed immutable integer value */
   IACAV_STRING,			/* UTF8 immutable string value */
   IACAV_NODE,			/* immutable copiable node value */
+  IACAV_TRANSNODE,		/* transient non-copiable node value */
   IACAV_SET,			/* immutable copiable dichotomized set of items */
   IACAV_ITEM,			/* [shared mutable] item with payload */
   IACAV_GOBJECT,		/* transient Gobject box with value */
@@ -130,6 +131,45 @@ struct iacavalue_st
 {
   unsigned v_kind;		/* the kind never changes and is non-zero! */
 };
+
+////////////////////////////////////////////////////////////////
+/* the name of tbe IaCa gtk application; should obey to
+   g_application_id_is_valid rules */
+#define IACA_GTK_APPLICATION_NAME "basile.iaca"
+
+/* the structure describing the entire state of the IaCa system */
+extern struct iacastate_st
+{
+  /* the topmost module for the whole program */
+  GModule *ia_progmodule;
+  /* hashtable of modules */
+  GHashTable *ia_module_htab;
+  /* hashtable of data spaces */
+  GHashTable *ia_dataspace_htab;
+  /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
+     strings */
+  GHashTable *ia_clofun_htab;
+  /* hashtable associating GObject* to their boxed values if any */
+  GHashTable *ia_boxgobject_htab;
+  /* last item identifier */
+  int64_t ia_item_last_ident;
+  /* the state directory */
+  char *ia_statedir;
+  /* the transient data space */
+  struct iacadataspace_st *ia_transientdataspace;
+  /* the toplevel dictionnary */
+  IacaItem *ia_topdictitm;
+  /* the dataspace hook closure item */
+  IacaItem *ia_dataspacehookitm;
+  /* the GTK initializing closure item */
+  IacaItem *ia_gtkinititm;
+  /* the module dumping closure item */
+  IacaItem *ia_moduledumpitm;
+  /* the GTK application, if any */
+  GtkApplication *ia_gtkapplication;
+  /* flag for debug messages */
+  gboolean ia_debug;
+} iaca;
 
 /******************** BOXED INTEGERS *************/
 /*** JSON:
@@ -194,7 +234,7 @@ static inline IacaString *iacac_string (IacaValue *v);
 /* Nodes are immutable, and have a non-null connector item and sons */
 struct iacanode_st
 {
-  unsigned v_kind;		/* always IACAV_KIND */
+  unsigned v_kind;		/* always IACAV_NODE */
   unsigned v_arity;		/* node arity, could even be a
 				   million, but much more is perhaps
 				   unreasonable */
@@ -214,6 +254,18 @@ extern IacaNode *iaca_node_makevarf (IacaValue *conn, ...)
   __attribute__ ((sentinel));
 #define iacav_node_makevar(Conn,...) \
   ((IacaValue*)(iaca_node_makevarf(Conn,##__VA_ARGS__,(IacaValue*)0)))
+
+// allocator of a transient node with its array of sons; return null if no
+// connective
+extern IacaNode *iaca_transnode_make (IacaValue *conn, IacaValue *sontab[],
+				      unsigned arity);
+#define iacav_transnode_make(Con,Sons,Ari) \
+  ((IacaValue*)iaca_transnode_make((Con),(Sons),(Ari)))
+// variadic allocator of a node with its sons, null terminated
+extern IacaNode *iaca_transnode_makevarf (IacaValue *conn, ...)
+  __attribute__ ((sentinel));
+#define iacav_transnode_makevar(Conn,...) \
+  ((IacaValue*)(iaca_transnode_makevarf(Conn,##__VA_ARGS__,(IacaValue*)0)))
 
 // safe accessors
 // get the connective or a default
@@ -726,7 +778,12 @@ iaca_item_pay_load_put_dictionnary_str (IacaItem *itm, const char *str,
   if (!itm || itm->v_kind != IACAV_ITEM
       || !str || !str[0]
       || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY || !val)
-    return;
+    {
+      iaca_debug
+	("fail iaca_item_pay_load_put_dict_str itm %p #%lld str '%s' val %p",
+	 itm, iaca_item_identll (itm), str, val);
+      return;
+    }
   strv = iaca_string_make (str);
   iaca_item_pay_load_put_dictionnary (itm, strv, val);
 }
@@ -896,44 +953,6 @@ iaca_item_pay_load_closure_set_nth (IacaItem *itm, int rk, IacaValue *val)
 /* recursively copy a value (and the sons of nodes) */
 extern IacaValue *iaca_copy (IacaValue *);
 
-////////////////////////////////////////////////////////////////
-/* the name of tbe IaCa gtk application; should obey to
-   g_application_id_is_valid rules */
-#define IACA_GTK_APPLICATION_NAME "basile.iaca"
-
-/* the structure describing the entire state of the IaCa system */
-extern struct iacastate_st
-{
-  /* the topmost module for the whole program */
-  GModule *ia_progmodule;
-  /* hashtable of modules */
-  GHashTable *ia_module_htab;
-  /* hashtable of data spaces */
-  GHashTable *ia_dataspace_htab;
-  /* hashtable of iacaclofun_st to speed-up iaca_find_clofun; keys are
-     strings */
-  GHashTable *ia_clofun_htab;
-  /* hashtable associating GObject* to their boxed values if any */
-  GHashTable *ia_boxgobject_htab;
-  /* last item identifier */
-  int64_t ia_item_last_ident;
-  /* the state directory */
-  char *ia_statedir;
-  /* the transient data space */
-  struct iacadataspace_st *ia_transientdataspace;
-  /* the toplevel dictionnary */
-  IacaItem *ia_topdictitm;
-  /* the dataspace hook closure item */
-  IacaItem *ia_dataspacehookitm;
-  /* the GTK initializing closure item */
-  IacaItem *ia_gtkinititm;
-  /* the module dumping closure item */
-  IacaItem *ia_moduledumpitm;
-  /* the GTK application, if any */
-  GtkApplication *ia_gtkapplication;
-  /* flag for debug messages */
-  gboolean ia_debug;
-} iaca;
 /*****************************************************************************
  *****************************************************************************
  *****************************************************************************/

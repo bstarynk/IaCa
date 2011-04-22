@@ -366,10 +366,14 @@ make_new_item_dialog (const char *txt, IacaItem *namededitoritm)
       iaca_item_physical_put ((IacaValue *) nameditm,
 			      (IacaValue *) iacafirst_itname,
 			      iacav_string_make (txt));
-      iaca_item_pay_load_put_dictionnary_str
-	(iaca.ia_topdictitm, txt, (IacaValue *) nameditm);
-      iaca_debug ("created named '%s' %p #%lld",
-		  txt, nameditm, iaca_item_identll (nameditm));
+      iaca_debug
+	("before put dict str topdictitm %p #%lld txt '%s' nameditm %p #%lld",
+	 iaca.ia_topdictitm, iaca_item_identll (iaca.ia_topdictitm), txt,
+	 nameditm, iaca_item_identll (nameditm));
+      iaca_item_pay_load_put_dictionnary_str (iaca.ia_topdictitm, txt,
+					      (IacaValue *) nameditm);
+      iaca_debug ("created named '%s' %p #%lld", txt, nameditm,
+		  iaca_item_identll (nameditm));
       update_completion_entry_topdict ();
       edit_named_item (txt, nameditm, namededitoritm);
     }
@@ -567,7 +571,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_box_pack_start (GTK_BOX (box), notebook, TRUE, TRUE, 2);
   //// create the statusbar 
   {
-    GtkStatusbar *statbar = gtk_statusbar_new ();
+    GtkWidget *statbar = gtk_statusbar_new ();
     gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET (statbar), FALSE, FALSE, 2);
     iacafirst_valstatbar = iacav_gobject_box (G_OBJECT (statbar));
   }
@@ -672,9 +676,11 @@ iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
   nam = iaca_string_val
     (iaca_item_physical_get ((IacaValue *) nitm,
 			     (IacaValue *) iacafirst_itname));
+  iaca_debug ("nam '%s' inside nitm %p #%lld", nam, nitm,
+	      iaca_item_identll (nitm));
   if (nam
-      && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm, nam)
-      != (IacaValue *) nitm)
+      && iaca_item_pay_load_dictionnary_get (iaca.ia_topdictitm,
+					     nam) != (IacaValue *) nitm)
     nam = 0;
   iaca_debug ("nam '%s'", nam);
   txbuf = gtk_text_buffer_new (NULL);
