@@ -504,9 +504,10 @@ struct iacadictentry_st
 
 struct iacapayloaddictionnary_st
 {
-  unsigned dic_siz;
-  unsigned dic_len;
-  struct iacadictentry_st dic_tab[];	/* size is dic_siz */
+  unsigned dic_size;
+  unsigned dic_count;
+  struct iacatabattr_st *dic_namatt;	/* associate item to their name */
+  struct iacadictentry_st *dic_ent;	/* size is dic_siz */
 };
 
 struct iacaqueuelink_st
@@ -1320,17 +1321,17 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
       || (dic = itm->v_payloaddict) == NULL)
     return NULL;
   lo = 0;
-  hi = (int) dic->dic_len - 1;
+  hi = (int) dic->dic_count - 1;
   while (lo + 1 < hi)
     {
       IacaString *str = 0;
       int cmp = 0;
       md = (lo + hi) / 2;
-      str = dic->dic_tab[md].de_str;
+      str = dic->dic_ent[md].de_str;
       g_assert (str != 0 && str->v_kind == IACAV_STRING);
       cmp = strcmp (str->v_str, name);
       if (!cmp)
-	return dic->dic_tab[md].de_val;
+	return dic->dic_ent[md].de_val;
       if (cmp < 0)
 	hi = md;
       else
@@ -1340,11 +1341,11 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
     {
       IacaString *str = 0;
       int cmp = 0;
-      str = dic->dic_tab[md].de_str;
+      str = dic->dic_ent[md].de_str;
       g_assert (str != 0);
       cmp = strcmp (str->v_str, name);
       if (!cmp)
-	return dic->dic_tab[md].de_val;
+	return dic->dic_ent[md].de_val;
     }
   return NULL;
 }
@@ -1359,12 +1360,12 @@ iaca_item_pay_load_dictionnary_next_string (IacaItem *itm, const char *name)
       || (dic = itm->v_payloaddict) == NULL)
     return NULL;
   lo = 0;
-  ln = (int) dic->dic_len;
+  ln = (int) dic->dic_count;
   hi = ln - 1;
   if (!name || !name[0])
     {
       if (hi >= 0)
-	return dic->dic_tab[0].de_str;
+	return dic->dic_ent[0].de_str;
       return NULL;
     }
   while (lo + 1 < hi)
@@ -1372,13 +1373,13 @@ iaca_item_pay_load_dictionnary_next_string (IacaItem *itm, const char *name)
       IacaString *str = 0;
       int cmp = 0;
       md = (lo + hi) / 2;
-      str = dic->dic_tab[md].de_str;
+      str = dic->dic_ent[md].de_str;
       g_assert (str != 0 && str->v_kind == IACAV_STRING);
       cmp = strcmp (str->v_str, name);
       if (!cmp)
 	{
 	  if (md + 1 < ln)
-	    return dic->dic_tab[md + 1].de_str;
+	    return dic->dic_ent[md + 1].de_str;
 	  else
 	    return NULL;
 	}
@@ -1391,13 +1392,13 @@ iaca_item_pay_load_dictionnary_next_string (IacaItem *itm, const char *name)
     {
       IacaString *str = 0;
       int cmp = 0;
-      str = dic->dic_tab[md].de_str;
+      str = dic->dic_ent[md].de_str;
       g_assert (str != 0);
       cmp = strcmp (str->v_str, name);
       if (!cmp)
 	{
 	  if (md + 1 < ln)
-	    return dic->dic_tab[md + 1].de_str;
+	    return dic->dic_ent[md + 1].de_str;
 	  else
 	    return NULL;
 	}

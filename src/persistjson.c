@@ -801,15 +801,16 @@ iaca_dump_scan_item_content (struct iacadumper_st *du, IacaItem *itm)
     case IACAPAYLOAD_DICTIONNARY:
       {
 	struct iacapayloaddictionnary_st *dic = itm->v_payloaddict;
-	unsigned len = dic ? dic->dic_len : 0;
-	for (unsigned ix = 0; ix < len; ix++)
-	  {
-	    IacaString *nam = dic->dic_tab[ix].de_str;
-	    IacaValue *val = dic->dic_tab[ix].de_val;
-	    if (!nam || !val)
-	      continue;
-	    iaca_dump_scan_value (du, val);
-	  }
+	unsigned len = dic ? dic->dic_count : 0;
+	if (dic->dic_ent)
+	  for (unsigned ix = 0; ix < len; ix++)
+	    {
+	      IacaString *nam = dic->dic_ent[ix].de_str;
+	      IacaValue *val = dic->dic_ent[ix].de_val;
+	      if (!nam || !val)
+		continue;
+	      iaca_dump_scan_value (du, val);
+	    }
 	break;
       }
     case IACAPAYLOAD_CLOSURE:
@@ -1054,16 +1055,17 @@ iaca_dump_item_pay_load_json (struct iacadumper_st *du, IacaItem *itm)
       {
 	struct iacapayloaddictionnary_st *dic = itm->v_payloaddict;
 	json_t *jsdic = json_object ();
-	unsigned len = dic ? dic->dic_len : 0;
-	for (unsigned ix = 0; ix < len; ix++)
-	  {
-	    IacaString *nam = dic->dic_tab[ix].de_str;
-	    IacaValue *val = dic->dic_tab[ix].de_val;
-	    if (!nam || !val)
-	      continue;
-	    json_object_set (jsdic, nam->v_str,
-			     iaca_dump_value_json (du, val));
-	  }
+	unsigned len = dic ? dic->dic_count : 0;
+	if (dic->dic_ent)
+	  for (unsigned ix = 0; ix < len; ix++)
+	    {
+	      IacaString *nam = dic->dic_ent[ix].de_str;
+	      IacaValue *val = dic->dic_ent[ix].de_val;
+	      if (!nam || !val)
+		continue;
+	      json_object_set (jsdic, nam->v_str,
+			       iaca_dump_value_json (du, val));
+	    }
 	js = json_object ();
 	json_object_set (js, "payloadkind", json_string ("dictionnary"));
 	json_object_set (js, "payloaddictlen", json_integer (len));
