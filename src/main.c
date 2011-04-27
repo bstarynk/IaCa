@@ -634,12 +634,171 @@ iaca_attribute_put_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat,
   return -1;
 }
 
+struct iacatabattr_st *
+iaca_attribute_put (struct iacatabattr_st *tbl, IacaItem *itat,
+		    IacaValue *val)
+{
+  if (!itat || itat->v_kind != IACAV_ITEM || !val)
+    return tbl;
+  if (!tbl)
+    {
+      int sz = 5;
+      int ix = -1;
+      tbl = iaca_alloc_data (sizeof (struct iacatabattr_st) + sz *
+			     sizeof (struct iacaentryattr_st));
+      tbl->at_size = sz;
+      tbl->at_count = 0;
+      ix = iaca_attribute_put_index_unsafe (tbl, itat, val);
+      if (ix < 0)
+	iaca_error ("corrupted attribute table %p", tbl);
+      return tbl;
+    };
+  if (tbl->at_count + tbl->at_size / 4 + 1 < tbl->at_size)
+    {
+      int newsz = 3 * tbl->at_count / 2 + 3;
+      int oldsz = tbl->at_size;
+      int newix = -1;
+      struct iacatabattr_st *newtbl = NULL;
+      /* round up newsz to a prime */
+      if (newsz <= 3)
+	newsz = 3;
+      else if (newsz <= 7)
+	newsz = 7;
+      else if (newsz <= 11)
+	newsz = 11;
+      else if (newsz <= 17)
+	newsz = 17;
+      else
+	newsz = g_spaced_primes_closest (newsz);
+      newtbl = iaca_alloc_data (sizeof (struct iacatabattr_st) + newsz *
+				sizeof (struct iacaentryattr_st));
+      newtbl->at_size = newsz;
+      newtbl->at_count = 0;
+      for (int oldix = 0; oldix < oldsz; oldix++)
+	{
+	  IacaItem *oldatit = tbl->at_entab[oldix].en_item;
+	  IacaValue *oldval = tbl->at_entab[oldix].en_val;
+	  if (!oldatit || oldatit == IACA_EMPTY_SLOT || !oldval)
+	    continue;
+	  newix = iaca_attribute_put_index_unsafe (newtbl, oldatit, oldval);
+	  if (newix < 0)
+	    iaca_error ("corrupted newtbl %p", newtbl);
+	}
+      GC_FREE (tbl);
+      tbl = newtbl;
+    }
+  if (iaca_attribute_put_index_unsafe (tbl, itat, val) < 0)
+    iaca_error ("corrupted tbl %p", tbl);
+  return tbl;
+}
+
+
+
+struct iacatabattr_st *
+iaca_attribute_remove (struct iacatabattr_st *tbl, IacaItem *itat)
+{
+  IacaValue *oldval = NULL;
+  unsigned sz = 0;
+  int ix = -1;
+  if (!itat || itat->v_kind != IACAV_ITEM || !tbl)
+    return tbl;
+  ix = iaca_attribute_index_unsafe (tbl, itat);
+  if (ix < 0)
+    return tbl;
+  oldval = tbl->at_entab[ix].en_val;
+  g_assert (oldval != NULL);
+  tbl->at_entab[ix].en_item = IACA_EMPTY_SLOT;
+  tbl->at_entab[ix].en_val = 0;
+  tbl->at_count--;
+  sz = tbl->at_size;
+  if (sz > 3 && tbl->at_count < sz / 3)
+    {
+      struct iacatabattr_st *newtbl = NULL;
+      int newsz = 3 * tbl->at_count / 2 + 1;
+      if (newsz <= 3)
+	newsz = 3;
+      else if (newsz <= 7)
+	newsz = 7;
+      else if (newsz <= 11)
+	newsz = 11;
+      else if (newsz <= 17)
+	newsz = 17;
+      else
+	newsz = g_spaced_primes_closest (newsz);
+      newtbl = iaca_alloc_data (sizeof (struct iacatabattr_st) + newsz *
+				sizeof (struct iacaentryattr_st));
+      newtbl->at_size = newsz;
+      newtbl->at_count = 0;
+      for (int oldix = 0; oldix < sz; oldix++)
+	{
+	  IacaItem *olditat = tbl->at_entab[oldix].en_item;
+	  IacaValue *oldval = NULL;
+	  int newix = -1;
+	  if (!olditat || olditat == IACA_EMPTY_SLOT
+	      || !(oldval = tbl->at_entab[oldix].en_val))
+	    continue;
+	  newix = iaca_attribute_put_index_unsafe (newtbl, olditat, oldval);
+	  if (newix < 0)
+	    iaca_error ("corrupted newtbl %p", newtbl);
+	}
+      GC_FREE (tbl);
+      tbl = newtbl;
+    };
+  return tbl;
+}
+
+
+struct iacatabattr_st *
+iaca_attribute_reorganize (struct iacatabattr_st *tbl, unsigned xtra)
+{
+  unsigned sz = tbl ? tbl->at_size : 0;
+  unsigned newsz = (tbl ? (4 * tbl->at_count / 3) : 0) + xtra + 1;
+  struct iacatabattr_st *newtbl = NULL;
+  /* round up newsz to a prime */
+  if (newsz <= 3)
+    newsz = 3;
+  else if (newsz <= 7)
+    newsz = 7;
+  else if (newsz <= 11)
+    newsz = 11;
+  else if (newsz <= 17)
+    newsz = 17;
+  else
+    newsz = g_spaced_primes_closest (newsz);
+  if (newsz == sz)
+    return tbl;
+  newtbl =
+    (struct iacatabattr_st *) iaca_alloc_data (sizeof (struct iacatabattr_st)
+					       +
+					       newsz *
+					       sizeof (struct
+						       iacaentryattr_st));
+  newtbl->at_size = newsz;
+  newtbl->at_count = 0;
+  for (unsigned ix = 0; ix < sz; ix++)
+    {
+      IacaItem *oldat = tbl->at_entab[ix].en_item;
+      IacaValue *oldval = NULL;
+      int newix = -1;
+      if (!oldat || oldat == IACA_EMPTY_SLOT
+	  || !(oldval = tbl->at_entab[ix].en_val))
+	continue;
+      newix = iaca_attribute_put_index_unsafe (newtbl, oldat, oldval);
+      if (newix < 0)
+	iaca_error ("corrupted newtbl %p", newtbl);
+    }
+  g_assert (tbl->at_count == newtbl->at_count);
+  GC_FREE (tbl);
+  return newtbl;
+}
+
+
 void
 iaca_item_attribute_reorganize (IacaValue *vitem, unsigned xtra)
 {
-  IacaItem *item = 0;
-  struct iacatabattr_st *tbl = 0;
-  struct iacatabattr_st *newtbl = 0;
+  IacaItem *item = NULL;
+  struct iacatabattr_st *tbl = NULL;
+  struct iacatabattr_st *newtbl = NULL;
   unsigned sz = 0;
   unsigned newsz = 0;
   unsigned cnt = 0;
@@ -1190,9 +1349,9 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
   if (ix < 0)
     return NULL;
   oldval = tbl->at_entab[ix].en_val;
-  g_assert (oldval != 0);
+  g_assert (oldval != NULL);
   tbl->at_entab[ix].en_item = IACA_EMPTY_SLOT;
-  tbl->at_entab[ix].en_val = 0;
+  tbl->at_entab[ix].en_val = NULL;
   tbl->at_count--;
   if (tbl->at_size > 10 && tbl->at_count < tbl->at_size / 5)
     iaca_item_attribute_reorganize (vitem, 0);
@@ -1208,7 +1367,6 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
   IacaValue *oldval = NULL;
   IacaItem *oldvalitm = NULL;
   IacaItem *newvalitm = NULL;
-#warning should put the name associated to newvalitem
   if (!itm || itm->v_kind != IACAV_ITEM
       || !strv || strv->v_kind != IACAV_STRING
       || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY || !val)
@@ -1234,6 +1392,9 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
       dic->dic_ent[0].de_str = strv;
       dic->dic_ent[0].de_val = val;
       dic->dic_count = 1;
+      if (newvalitm)
+	dic->dic_namatt =
+	  iaca_attribute_put (NULL, newvalitm, (IacaValue *) strv);
       return;
     }
   while (lo + 1 < hi)
@@ -1249,6 +1410,13 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
 	  oldval = dic->dic_ent[md].de_val;
 	  dic->dic_ent[md].de_val = val;
 	  oldvalitm = iacac_item (oldval);
+	  if (oldvalitm)
+	    dic->dic_namatt =
+	      iaca_attribute_remove (dic->dic_namatt, oldvalitm);
+	  if (newvalitm)
+	    dic->dic_namatt =
+	      iaca_attribute_put (dic->dic_namatt, newvalitm,
+				  (IacaValue *) strv);
 	  return;
 	}
       if (cmp < 0)
@@ -1266,6 +1434,14 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
 	{
 	  oldval = dic->dic_ent[md].de_val;
 	  dic->dic_ent[md].de_val = val;
+	  oldvalitm = iacac_item (oldval);
+	  if (oldvalitm)
+	    dic->dic_namatt =
+	      iaca_attribute_remove (dic->dic_namatt, oldvalitm);
+	  if (newvalitm)
+	    dic->dic_namatt =
+	      iaca_attribute_put (dic->dic_namatt, newvalitm,
+				  (IacaValue *) strv);
 	  return;
 	};
       if (cmp > 0)
@@ -1296,6 +1472,7 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
   int lo = 0, hi = 0, md = 0;
   int ix = -1;
   struct iacapayloaddictionnary_st *dic = 0;
+  IacaItem *oldnamit = 0;
   if (!itm || itm->v_kind != IACAV_ITEM
       || !name || !name[0] || itm->v_payloadkind != IACAPAYLOAD_DICTIONNARY)
     return;
@@ -1314,6 +1491,10 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
       cmp = strcmp (str->v_str, name);
       if (!cmp)
 	{
+	  oldnamit = iacac_item (dic->dic_ent[md].de_val);
+	  if (oldnamit)
+	    dic->dic_namatt =
+	      iaca_attribute_remove (dic->dic_namatt, oldnamit);
 	  ix = md;
 	  break;
 	}
@@ -1333,6 +1514,10 @@ iaca_item_pay_load_remove_dictionnary_str (IacaItem *itm, const char *name)
       if (!cmp)
 	{
 	  ix = md;
+	  oldnamit = iacac_item (dic->dic_ent[md].de_val);
+	  if (oldnamit)
+	    dic->dic_namatt =
+	      iaca_attribute_remove (dic->dic_namatt, oldnamit);
 	  break;
 	}
     }

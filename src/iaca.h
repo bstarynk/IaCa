@@ -1127,6 +1127,25 @@ iaca_attribute_index_unsafe (struct iacatabattr_st *tbl, IacaItem *itat)
 }
 
 static inline IacaValue *
+iaca_attribute_get_def (struct iacatabattr_st *tbl, IacaItem *itat,
+			IacaValue *def)
+{
+  int ix = -1;
+  if (!tbl || !itat || itat->v_kind != IACAV_ITEM)
+    return def;
+  ix = iaca_attribute_index_unsafe (tbl, itat);
+  if (ix < 0)
+    return def;
+  return tbl->at_entab[ix].en_val;
+}
+
+#define iaca_attribute_get (Tbl,Itat) iaca_attribute_get_def((Tbl),(Itat),((IacaValue*)0))
+
+extern struct iacatabattr_st *iaca_attribute_put (struct iacatabattr_st *tbl,
+						  IacaItem *itat,
+						  IacaValue *val);
+
+static inline IacaValue *
 iaca_item_physical_get_def (IacaValue *vitem, IacaValue *vattr,
 			    IacaValue *vdef)
 {
