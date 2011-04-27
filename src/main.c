@@ -1659,7 +1659,7 @@ main (int argc, char **argv)
   iaca_debug ("ia_gtkinititm %p #%lld", iaca.ia_gtkinititm,
 	      (long long) (iaca.ia_gtkinititm ? iaca.
 			   ia_gtkinititm->v_ident : 0LL));
-  if (iaca_want_dump) 
+  if (iaca_want_dump)
     {
       iaca_warning ("before forced dump");
       iaca_dump (NULL);
