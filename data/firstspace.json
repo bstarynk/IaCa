@@ -8,12 +8,16 @@
    "itemcontent": null,
    "itempayload": {
     "payloaddictionnary": {
+     "simple_editing": {
+      "id": 5,
+      "kd": "itrv"
+     },
      "the_dictionnary": {
       "id": 1,
       "kd": "itrv"
      }
     },
-    "payloaddictlen": 1,
+    "payloaddictlen": 2,
     "payloadkind": "dictionnary"
    }
   },
@@ -53,9 +57,20 @@
    "itemcontent": null,
    "itempayload": {
     "payloadclofun": "itemeditor",
-    "payloadcloval": [],
+    "payloadcloval": [
+     {
+      "id": 5,
+      "kd": "itrv"
+     }
+    ],
     "payloadkind": "closure"
    }
+  },
+  {
+   "item": 5,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": null
   }
  ]
 }
