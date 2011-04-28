@@ -754,6 +754,11 @@ extern void iaca_item_pay_load_reserve_dictionnary (IacaItem *itm,
 static inline IacaValue *iaca_item_pay_load_dictionnary_get
   (IacaItem *itm, const char *name);
 
+static inline IacaString *iaca_item_pay_load_dictionnary_name
+  (IacaItem *dictitm, IacaItem *nameditm);
+#define iacav_item_pay_load_dictionnary_name(Dicit,Namedit) \
+  ((IacaValue*)iaca_item_pay_load_dictionnary_name((Dicit),(Namedit)))
+
 static inline IacaString *iaca_item_pay_load_dictionnary_next_string
   (IacaItem *itm, const char *name);
 
@@ -1368,6 +1373,28 @@ iaca_item_pay_load_dictionnary_get (IacaItem *itm, const char *name)
     }
   return NULL;
 }
+
+static inline IacaString *iaca_item_pay_load_dictionnary_name
+  (IacaItem *dictitm, IacaItem *nameditm)
+{
+  struct iacapayloaddictionnary_st *dic = NULL;
+  struct iacatabattr_st *atbl = NULL;
+  IacaString *str = NULL;
+  int ix = -1;
+  if (!dictitm || dictitm->v_kind != IACAV_ITEM
+      || !nameditm || nameditm->v_kind != IACAV_ITEM
+      || dictitm->v_payloadkind != IACAPAYLOAD_DICTIONNARY
+      || (dic = dictitm->v_payloaddict) == NULL
+      || (atbl = dic->dic_namatt) == NULL)
+    return NULL;
+  ix = iaca_attribute_index_unsafe (atbl, nameditm);
+  if (ix < 0)
+    return NULL;
+  str = (IacaString *) (atbl->at_entab[ix].en_val);
+  g_assert (str && str->v_kind == IACAV_STRING);
+  return str;
+}
+
 
 static inline IacaString *
 iaca_item_pay_load_dictionnary_next_string (IacaItem *itm, const char *name)

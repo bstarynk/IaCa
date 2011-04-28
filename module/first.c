@@ -51,10 +51,36 @@ IACA_DEFINE_CLOFUN (gtkapplinit,
 
 ////////////////////////////////////////////////////////////////
 
+/// closed values for named editor
+enum iacanamededitorval_en
+{
+  IACANAMEDEDITOR__LAST
+};
+
+
+/* should return a boxed widget */
+static IacaValue *
+iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
+{
+  IacaValue *res = NULL;
+  IacaItem *nitm = iacac_item (v1);
+  iaca_debug ("start v1 %p nitm#%lld cloitm %p",
+	      v1, iaca_item_identll (nitm), cloitm);
+  return res;
+}
+
+IACA_DEFINE_CLOFUN (namededitor,
+		    IACANAMEDEDITOR__LAST, one_value, iacafirst_namededitor);
+
+////////////////////////////////////////////////////////////////
+
 static void
 edit_named_item (const char *txt, IacaItem *nameditm,
 		 IacaItem *namededitoritm)
 {
+  iaca_debug ("nameditm %p #%lld namededitoritm %p #%lld",
+	      nameditm, iaca_item_identll (nameditm),
+	      namededitoritm, iaca_item_identll (namededitoritm));
   iaca_error ("edit_named_item txt %s not implemented", txt);
 #warning edit_named_item not implemented
 }
@@ -118,7 +144,7 @@ make_new_item_dialog (const char *txt, IacaItem *namededitoritm)
 }
 
 static void
-popup_final_dialog (gpointer ptr)
+popup_final_dialog (GtkWidget *w, gpointer ptr)
 {
   GtkWidget *dial = 0;
   GtkWidget *lab = 0;
@@ -126,6 +152,7 @@ popup_final_dialog (gpointer ptr)
   char *realstatedir = 0;
   guint res = 0;
   g_assert (ptr == NULL);
+  g_assert (w != NULL);
   dial = gtk_dialog_new_with_buttons ("Finally dump state",
 				      (GtkWindow *) 0,
 				      GTK_DIALOG_MODAL |
@@ -393,29 +420,35 @@ IACA_DEFINE_CLOFUN (activateapplication,
 void
 iacamod_first_init1 (void)
 {
-  IacaItem *itdict = 0;
+  IacaItem *itdict = NULL;
+  IacaItem *itapp = NULL;
+  IacaItem *itnamededitor = NULL;
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
     iaca_error ("missing top level dictionnary");
   iaca_debug ("iaca.ia_gtkinititm %p #%lld",
 	      iaca.ia_gtkinititm, iaca_item_identll (iaca.ia_gtkinititm));
-#if 0
-  {
-    IacaItem *itapp = 0;
-    itapp =
-      iacac_item (iaca_item_pay_load_closure_nth (iaca.ia_gtkinititm,
-						  IACAGTKINITVAL_ACTIVEAPPL));
-    if (!itapp)
-      {
-	itapp = iaca_item_make (iacafirst_dsp);
-	iaca_item_pay_load_make_closure (itapp,
-					 &iacacfun_activateapplication,
-					 (IacaValue **) 0);
-	iaca_item_pay_load_closure_set_nth (iaca.ia_gtkinititm,
-					    IACAGTKINITVAL_ACTIVEAPPL,
-					    (IacaValue *) itapp);
-      }
-  }
-#endif
+  itapp =
+    iacac_item (iaca_item_pay_load_closure_nth (iaca.ia_gtkinititm,
+						IACAGTKINITVAL_ACTIVEAPPL));
+  iaca_debug ("itapp %p #%lld", itapp, iaca_item_identll (itapp));
+  g_assert (itapp != NULL);
+  itnamededitor =
+    iacac_item (iaca_item_pay_load_closure_nth (itapp,
+						IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR));
+  iaca_debug ("itnamededitor %p #%lld", itnamededitor,
+	      iaca_item_identll (itnamededitor));
+  if (!itnamededitor)
+    {
+      itnamededitor = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_make_closure (itnamededitor,
+				       &iacacfun_namededitor,
+				       (IacaValue **) 0);
+      iaca_item_pay_load_closure_set_nth (itapp,
+					  IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
+					  (IacaValue *) itnamededitor);
+      iaca_debug ("made itnamededitor %p #%lld", itnamededitor,
+		  iaca_item_identll (itnamededitor));
+    }
 }

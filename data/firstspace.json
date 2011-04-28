@@ -4,28 +4,16 @@
  "itemcont": [
   {
    "item": 1,
-   "itemattrs": [
-    {
-     "atid": 3,
-     "val": {
-      "kd": "strv",
-      "str": "the_dictionnary"
-     }
-    }
-   ],
+   "itemattrs": [],
    "itemcontent": null,
    "itempayload": {
     "payloaddictionnary": {
-     "name": {
-      "id": 3,
-      "kd": "itrv"
-     },
      "the_dictionnary": {
       "id": 1,
       "kd": "itrv"
      }
     },
-    "payloaddictlen": 2,
+    "payloaddictlen": 1,
     "payloadkind": "dictionnary"
    }
   },
@@ -37,7 +25,7 @@
     "payloadclofun": "gtkapplinit",
     "payloadcloval": [
      {
-      "id": 5,
+      "id": 3,
       "kd": "itrv"
      }
     ],
@@ -46,24 +34,25 @@
   },
   {
    "item": 3,
-   "itemattrs": [
-    {
-     "atid": 3,
-     "val": {
-      "kd": "strv",
-      "str": "name"
-     }
-    }
-   ],
-   "itemcontent": null,
-   "itempayload": null
-  },
-  {
-   "item": 5,
    "itemattrs": [],
    "itemcontent": null,
    "itempayload": {
     "payloadclofun": "activateapplication",
+    "payloadcloval": [
+     {
+      "id": 4,
+      "kd": "itrv"
+     }
+    ],
+    "payloadkind": "closure"
+   }
+  },
+  {
+   "item": 4,
+   "itemattrs": [],
+   "itemcontent": null,
+   "itempayload": {
+    "payloadclofun": "namededitor",
     "payloadcloval": [],
     "payloadkind": "closure"
    }
