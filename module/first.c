@@ -22,6 +22,7 @@
 
 
 static struct iacadataspace_st *iacafirst_dsp;
+static GtkApplication *iacafirst_gapp;
 
 /* the boxed gobject value for the top entry */
 static IacaValue *iacafirst_valentry;
@@ -41,6 +42,7 @@ iacafirst_gtkinit (GObject *gob, IacaItem *cloitm)
 								     IACAGTKINITVAL_ACTIVEAPPL));
   iaca_debug ("gapp %p itactivapp %p", gapp, itactivapp);
   g_assert (GTK_IS_APPLICATION (gapp));
+  iacafirst_gapp = gapp;
   g_signal_connect ((GObject *) gapp, "activate",
 		    G_CALLBACK (iaca_item_pay_load_closure_gobject_do),
 		    (gpointer) itactivapp);
@@ -51,38 +53,46 @@ IACA_DEFINE_CLOFUN (gtkapplinit,
 
 ////////////////////////////////////////////////////////////////
 
-/// closed values for named editor
-enum iacanamededitorval_en
+/// closed values for item editor
+enum iacaitemeditorval_en
 {
-  IACANAMEDEDITOR__LAST
+  IACAITEMEDITOR_SIMPLE_EDITING,
+  IACAITEMEDITOR__LAST
 };
 
 
-/* should return a boxed widget */
+/* should return a boxed window */
 static IacaValue *
-iacafirst_namededitor (IacaValue *v1, IacaItem *cloitm)
+iacafirst_itemeditor (IacaValue *v1, IacaItem *cloitm)
 {
   IacaValue *res = NULL;
   IacaItem *nitm = iacac_item (v1);
+  GtkWindow *winedit = NULL;
   iaca_debug ("start v1 %p nitm#%lld cloitm %p",
 	      v1, iaca_item_identll (nitm), cloitm);
+  if (!nitm)
+    return NULL;
+  winedit = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
+  gtk_window_set_application (winedit, iacafirst_gapp);
   return res;
 }
 
-IACA_DEFINE_CLOFUN (namededitor,
-		    IACANAMEDEDITOR__LAST, one_value, iacafirst_namededitor);
+IACA_DEFINE_CLOFUN (itemeditor,
+		    IACAITEMEDITOR__LAST, one_value, iacafirst_itemeditor);
 
 ////////////////////////////////////////////////////////////////
 
 static void
-edit_named_item (const char *txt, IacaItem *nameditm,
-		 IacaItem *namededitoritm)
+edit_named_item (const char *txt, IacaItem *nameditm, IacaItem *itemeditoritm)
 {
-  iaca_debug ("nameditm %p #%lld namededitoritm %p #%lld",
-	      nameditm, iaca_item_identll (nameditm),
-	      namededitoritm, iaca_item_identll (namededitoritm));
-  iaca_error ("edit_named_item txt %s not implemented", txt);
-#warning edit_named_item not implemented
+  IacaValue *vedit = NULL;
+  iaca_debug ("txt '%s' nameditm %p #%lld itemeditoritm %p #%lld",
+	      txt, nameditm, iaca_item_identll (nameditm),
+	      itemeditoritm, iaca_item_identll (itemeditoritm));
+  vedit =
+    iaca_item_pay_load_closure_one_value ((IacaValue *) nameditm,
+					  itemeditoritm);
+  iaca_debug ("vedit %p", vedit);
 }
 
 static void
@@ -107,7 +117,7 @@ bad_entry_name_dialog (const char *txt)
 }
 
 static void
-make_new_item_dialog (const char *txt, IacaItem *namededitoritm)
+make_new_item_dialog (const char *txt, IacaItem *itemeditoritm)
 {
   GtkWidget *dial = 0;
   IacaItem *nameditm = 0;
@@ -136,7 +146,7 @@ make_new_item_dialog (const char *txt, IacaItem *namededitoritm)
 					      (IacaValue *) nameditm);
       iaca_debug ("created named '%s' %p #%lld", txt, nameditm,
 		  iaca_item_identll (nameditm));
-      edit_named_item (txt, nameditm, namededitoritm);
+      edit_named_item (txt, nameditm, itemeditoritm);
     }
   else
     nameditm = 0;
@@ -299,13 +309,13 @@ static void
 edit_named_cb (GtkWidget *menu, gpointer data)
 {
   GtkEntry *entry = GTK_ENTRY (iaca_gobject (iacafirst_valentry));
-  IacaItem *namededitoritm = data;
+  IacaItem *itemeditoritm = data;
   const gchar *txt = 0;
   const gchar *endtxt = 0;
   IacaItem *nameditm = 0;
   bool goodname = 0;
   g_assert (GTK_IS_ENTRY (entry));
-  g_assert (namededitoritm && namededitoritm->v_kind == IACAV_ITEM);
+  g_assert (itemeditoritm && itemeditoritm->v_kind == IACAV_ITEM);
   txt = gtk_entry_get_text (entry);
   iaca_debug ("txt '%s'", txt);
   if (!g_utf8_validate (txt, -1, &endtxt))
@@ -326,9 +336,9 @@ edit_named_cb (GtkWidget *menu, gpointer data)
 			 (iaca.ia_topdictitm, txt));
   iaca_debug ("nameditm %p #%lld", nameditm, iaca_item_identll (nameditm));
   if (!nameditm)
-    make_new_item_dialog (txt, namededitoritm);
+    make_new_item_dialog (txt, itemeditoritm);
   else
-    edit_named_item (txt, nameditm, namededitoritm);
+    edit_named_item (txt, nameditm, itemeditoritm);
 }				/* end edit_named_cb */
 
 
@@ -336,7 +346,7 @@ edit_named_cb (GtkWidget *menu, gpointer data)
 /// activate the application
 enum iacaactivateapplicationval_en
 {
-  IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
+  IACAACTIVATEAPPLICATIONVAL_ITEM_EDITOR,
   IACAACTIVATEAPPLICATIONVAL__LAST
 };
 static void
@@ -345,7 +355,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   GtkWindow *win = 0;
   GtkWidget *box = 0;
   GtkWidget *ent = 0;
-  IacaItem *namededitoritm = 0;
+  IacaItem *itemeditoritm = 0;
   GtkWidget *menubar = 0;
   GtkWidget *filemenu = 0;
   GtkWidget *filesubmenu = 0;
@@ -362,10 +372,10 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   iaca_debug ("gapp %p cloitm %p #%lld", gapp, cloitm,
 	      iaca_item_identll (cloitm));
   g_assert (GTK_IS_APPLICATION (app));
-  namededitoritm =
+  itemeditoritm =
     iacac_item
     (iaca_item_pay_load_closure_nth (cloitm,
-				     IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR));
+				     IACAACTIVATEAPPLICATIONVAL_ITEM_EDITOR));
   win = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
   g_signal_connect (win, "destroy", G_CALLBACK (popup_final_dialog),
 		    (gpointer) 0);
@@ -402,7 +412,7 @@ iacafirst_activateapplication (GObject *gapp, IacaItem *cloitm)
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), cutmenu);
   gtk_menu_shell_append (GTK_MENU_SHELL (editsubmenu), pastemenu);
   g_signal_connect (namedmenu, "activate", G_CALLBACK (edit_named_cb),
-		    namededitoritm);
+		    itemeditoritm);
   gtk_box_pack_start (GTK_BOX (box), menubar, FALSE, FALSE, 2);
   ent = gtk_entry_new ();
   iacafirst_valentry = iacav_gobject_box (G_OBJECT (ent));
@@ -422,7 +432,8 @@ iacamod_first_init1 (void)
 {
   IacaItem *itdict = NULL;
   IacaItem *itapp = NULL;
-  IacaItem *itnamededitor = NULL;
+  IacaItem *ititemeditor = NULL;
+  IacaItem *itsimpleediting = NULL;
   iacafirst_dsp = iaca_dataspace ("firstspace");
   iaca_debug ("init1 of first iacafirst_dsp=%p", iacafirst_dsp);
   if (!(itdict = iaca.ia_topdictitm))
@@ -434,21 +445,26 @@ iacamod_first_init1 (void)
 						IACAGTKINITVAL_ACTIVEAPPL));
   iaca_debug ("itapp %p #%lld", itapp, iaca_item_identll (itapp));
   g_assert (itapp != NULL);
-  itnamededitor =
+  ititemeditor =
     iacac_item (iaca_item_pay_load_closure_nth (itapp,
-						IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR));
-  iaca_debug ("itnamededitor %p #%lld", itnamededitor,
-	      iaca_item_identll (itnamededitor));
-  if (!itnamededitor)
+						IACAACTIVATEAPPLICATIONVAL_ITEM_EDITOR));
+  iaca_debug ("ititemeditor %p #%lld", ititemeditor,
+	      iaca_item_identll (ititemeditor));
+  g_assert (ititemeditor != NULL);
+  itsimpleediting =
+    iacac_item (iaca_item_pay_load_closure_nth (ititemeditor,
+						IACAITEMEDITOR_SIMPLE_EDITING));
+  iaca_debug ("itsimpleediting %p #%lld", itsimpleediting,
+	      iaca_item_identll (itsimpleediting));
+  if (!itsimpleediting)
     {
-      itnamededitor = iaca_item_make (iacafirst_dsp);
-      iaca_item_pay_load_make_closure (itnamededitor,
-				       &iacacfun_namededitor,
-				       (IacaValue **) 0);
-      iaca_item_pay_load_closure_set_nth (itapp,
-					  IACAACTIVATEAPPLICATIONVAL_NAMED_EDITOR,
-					  (IacaValue *) itnamededitor);
-      iaca_debug ("made itnamededitor %p #%lld", itnamededitor,
-		  iaca_item_identll (itnamededitor));
+      itsimpleediting = iaca_item_make (iacafirst_dsp);
+      iaca_item_pay_load_closure_set_nth (ititemeditor,
+					  IACAITEMEDITOR_SIMPLE_EDITING,
+					  (IacaValue *) itsimpleediting);
+      iaca_item_pay_load_put_dictionnary_str
+	(iaca.ia_topdictitm, "simple_editing", (IacaValue *) itsimpleediting);
+      iaca_debug ("made itsimpleediting %p #%lld", itsimpleediting,
+		  iaca_item_identll (itsimpleediting));
     }
 }

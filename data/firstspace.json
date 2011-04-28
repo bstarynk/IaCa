@@ -52,7 +52,7 @@
    "itemattrs": [],
    "itemcontent": null,
    "itempayload": {
-    "payloadclofun": "namededitor",
+    "payloadclofun": "itemeditor",
     "payloadcloval": [],
     "payloadkind": "closure"
    }
