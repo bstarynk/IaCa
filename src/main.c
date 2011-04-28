@@ -1191,7 +1191,7 @@ iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt, ...)
 
 
 void
-iaca_item_pay_load_reserve_dictionnary (IacaItem *itm, unsigned sz)
+iaca_item_pay_load_dictionnary_reserve (IacaItem *itm, unsigned sz)
 {
   unsigned nsz = 0;
   struct iacapayloaddictionnary_st *dic = NULL;
@@ -1359,7 +1359,7 @@ iaca_item_physical_remove (IacaValue *vitem, IacaValue *vattr)
 }
 
 void
-iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
+iaca_item_pay_load_dictionnary_put (IacaItem *itm, IacaString *strv,
 				    IacaValue *val)
 {
   int lo = 0, hi = 0, md = 0;
@@ -1375,12 +1375,12 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
   dic = itm->v_payloaddict;
   if (!dic)
     {
-      iaca_item_pay_load_reserve_dictionnary (itm, 5);
+      iaca_item_pay_load_dictionnary_reserve (itm, 5);
       dic = itm->v_payloaddict;
     }
   else if (dic->dic_count + 2 >= dic->dic_size)
     {
-      iaca_item_pay_load_reserve_dictionnary (itm,
+      iaca_item_pay_load_dictionnary_reserve (itm,
 					      5 * dic->dic_count / 4 + 10);
       dic = itm->v_payloaddict;
     }
@@ -1452,6 +1452,10 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
 	  dic->dic_ent[md].de_str = strv;
 	  dic->dic_ent[md].de_val = val;
 	  dic->dic_count++;
+	  if (newvalitm)
+	    dic->dic_namatt =
+	      iaca_attribute_put (dic->dic_namatt, newvalitm,
+				  (IacaValue *) strv);
 	  return;
 	}
     }
@@ -1462,6 +1466,9 @@ iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
       dic->dic_ent[md].de_str = strv;
       dic->dic_ent[md].de_val = val;
       dic->dic_count++;
+      if (newvalitm)
+	dic->dic_namatt =
+	  iaca_attribute_put (dic->dic_namatt, newvalitm, (IacaValue *) strv);
       return;
     }
 }

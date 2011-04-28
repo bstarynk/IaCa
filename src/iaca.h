@@ -748,7 +748,7 @@ extern void iaca_item_pay_load_bufprintf (IacaItem *itm, const char *fmt,
 
 static inline unsigned iaca_item_pay_load_buffer_length (IacaItem *itm);
 
-extern void iaca_item_pay_load_reserve_dictionnary (IacaItem *itm,
+extern void iaca_item_pay_load_dictionnary_reserve (IacaItem *itm,
 						    unsigned sz);
 
 static inline IacaValue *iaca_item_pay_load_dictionnary_get
@@ -773,11 +773,11 @@ static inline IacaString *iaca_item_pay_load_dictionnary_next_string
 	iaca_string_val((IacaValue*)(Strvar))))
 
 extern void
-iaca_item_pay_load_put_dictionnary (IacaItem *itm, IacaString *strv,
+iaca_item_pay_load_dictionnary_put (IacaItem *itm, IacaString *strv,
 				    IacaValue *val);
 
 static inline void
-iaca_item_pay_load_put_dictionnary_str (IacaItem *itm, const char *str,
+iaca_item_pay_load_dictionnary_put_str (IacaItem *itm, const char *str,
 					IacaValue *val)
 {
   IacaString *strv = 0;
@@ -791,7 +791,7 @@ iaca_item_pay_load_put_dictionnary_str (IacaItem *itm, const char *str,
       return;
     }
   strv = iaca_string_make (str);
-  iaca_item_pay_load_put_dictionnary (itm, strv, val);
+  iaca_item_pay_load_dictionnary_put (itm, strv, val);
 }
 
 extern void
@@ -1144,7 +1144,7 @@ iaca_attribute_get_def (struct iacatabattr_st *tbl, IacaItem *itat,
   return tbl->at_entab[ix].en_val;
 }
 
-#define iaca_attribute_get (Tbl,Itat) iaca_attribute_get_def((Tbl),(Itat),((IacaValue*)0))
+#define iaca_attribute_get(Tbl,Itat) iaca_attribute_get_def((Tbl),(Itat),((IacaValue*)0))
 
 extern struct iacatabattr_st *iaca_attribute_put (struct iacatabattr_st *tbl,
 						  IacaItem *itat,

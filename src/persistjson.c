@@ -325,7 +325,7 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	  int ln =
 	    json_integer_value (json_object_get (js, "payloaddictlen"));
 	  json_t *jsdict = json_object_get (js, "payloaddictionnary");
-	  iaca_item_pay_load_reserve_dictionnary (itm, ln + ln / 8 + 5);
+	  iaca_item_pay_load_dictionnary_reserve (itm, ln + ln / 8 + 5);
 	  for (void *iter = json_object_iter (jsdict);
 	       iter; iter = json_object_iter_next (jsdict, iter))
 	    {
@@ -333,7 +333,7 @@ iaca_load_item_pay_load (struct iacaloader_st *ld, IacaItem *itm, json_t *js)
 	      const char *key = json_object_iter_key (iter);
 	      IacaValue *val = iaca_json_to_value (ld, jsval);
 	      if (key && val)
-		iaca_item_pay_load_put_dictionnary_str (itm, key, val);
+		iaca_item_pay_load_dictionnary_put_str (itm, key, val);
 	    }
 	}
       else if (!strcmp (kdstr, "closure"))

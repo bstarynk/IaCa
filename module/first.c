@@ -24,6 +24,9 @@
 static struct iacadataspace_st *iacafirst_dsp;
 static GtkApplication *iacafirst_gapp;
 
+/* associate simple editors to edited items */
+static struct iacatabattr_st *iacafirst_itemwinattr;
+
 /* the boxed gobject value for the top entry */
 static IacaValue *iacafirst_valentry;
 
@@ -68,12 +71,94 @@ iacafirst_itemeditor (IacaValue *v1, IacaItem *cloitm)
   IacaValue *res = NULL;
   IacaItem *nitm = iacac_item (v1);
   GtkWindow *winedit = NULL;
-  iaca_debug ("start v1 %p nitm#%lld cloitm %p",
-	      v1, iaca_item_identll (nitm), cloitm);
+  GtkWidget *box = NULL;
+  GtkWidget *txview = NULL;
+  GtkTextBuffer *txbuf = NULL;
+  GtkWidget *scrwin = NULL;
+  IacaString *namestr = NULL;
+  GtkTextIter endit = { };
+  IacaItem *itsimpleediting = NULL;
+  IacaValue *valtxview = NULL;
+  itsimpleediting
+    =
+    iacac_item (iaca_item_pay_load_closure_nth
+		(cloitm, IACAITEMEDITOR_SIMPLE_EDITING));
+  iaca_debug ("start v1 %p nitm#%lld cloitm %p itsimpleediting %p #%lld", v1,
+	      iaca_item_identll (nitm), cloitm, itsimpleediting,
+	      iaca_item_identll (itsimpleediting));
   if (!nitm)
     return NULL;
-  winedit = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
-  gtk_window_set_application (winedit, iacafirst_gapp);
+  res = iaca_attribute_get (iacafirst_itemwinattr, nitm);
+  if (res)
+    {
+      iaca_debug ("found previous res %p", res);
+      return res;
+    }
+  namestr = iaca_item_pay_load_dictionnary_name (iaca.ia_topdictitm, nitm);
+  {
+    char *title = NULL;
+    if (namestr)
+      title =
+	g_strdup_printf ("IaCa / %s",
+			 iaca_string_val ((IacaValue *) namestr));
+    else
+      title = g_strdup_printf ("IaCa / #%lld", iaca_item_identll (nitm));
+    winedit = GTK_WINDOW (gtk_window_new (GTK_WINDOW_TOPLEVEL));
+    gtk_window_set_application (winedit, iacafirst_gapp);
+    gtk_window_set_title (winedit, title);
+    gtk_window_set_default_size (winedit, 400, -1);
+    g_free (title), (title = NULL);
+  }
+  scrwin = gtk_scrolled_window_new (NULL, NULL);
+  gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrwin),
+				  GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+  txview = gtk_text_view_new ();
+  valtxview = iacav_gobject_box (G_OBJECT (txview));
+  txbuf = gtk_text_view_get_buffer (GTK_TEXT_VIEW (txview));
+  gtk_text_view_set_editable (GTK_TEXT_VIEW (txview), FALSE);
+  gtk_text_buffer_create_tag (txbuf, "title",
+			      "editable", FALSE,
+			      "foreground", "navy",
+			      "background", "ivory",
+			      "scale", PANGO_SCALE_X_LARGE,
+			      "family", "Verdana",
+			      "justification", GTK_JUSTIFY_CENTER,
+			      "weight", PANGO_WEIGHT_BOLD, NULL);
+  gtk_text_buffer_create_tag (txbuf, "decor",
+			      "foreground", "firebrick", NULL);
+  gtk_text_buffer_create_tag (txbuf, "serial",
+			      "foreground", "darkblue",
+			      "style", PANGO_STYLE_ITALIC, NULL);
+  gtk_text_buffer_create_tag (txbuf, "literal",
+			      "foreground", "darkgreen",
+			      "background", "lightpink",
+			      "family", "Andale Mono",
+			      "style", PANGO_STYLE_ITALIC, NULL);
+  gtk_text_buffer_get_end_iter (txbuf, &endit);
+  if (namestr)
+    {
+      gtk_text_buffer_insert_with_tags_by_name
+	(txbuf, &endit, iaca_string_val ((IacaValue *) namestr), -1, "title",
+	 NULL);
+      gtk_text_buffer_insert_with_tags_by_name (txbuf, &endit, " ", 1,
+						"title", NULL);
+    };
+  {
+    char serbuf[32];
+    memset (serbuf, 0, sizeof (serbuf));
+    snprintf (serbuf, sizeof (serbuf) - 1, "#%lld", iaca_item_identll (nitm));
+    gtk_text_buffer_insert_with_tags_by_name
+      (txbuf, &endit, serbuf, -1, "title", "serial", NULL);
+  }
+  gtk_container_add (GTK_CONTAINER (scrwin), txview);
+  box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 3);
+  gtk_box_pack_start (GTK_BOX (box), scrwin, TRUE, TRUE, 2);
+  gtk_container_add (GTK_CONTAINER (winedit), box);
+  gtk_widget_show_all (GTK_WIDGET (winedit));
+  res = iacav_transnode_makevar ((IacaValue *) itsimpleediting, valtxview);
+  iacafirst_itemwinattr =
+    iaca_attribute_put (iacafirst_itemwinattr, nitm, res);
+  iaca_debug ("res %p", res);
   return res;
 }
 
@@ -142,7 +227,7 @@ make_new_item_dialog (const char *txt, IacaItem *itemeditoritm)
 	("before put dict str topdictitm %p #%lld txt '%s' nameditm %p #%lld",
 	 iaca.ia_topdictitm, iaca_item_identll (iaca.ia_topdictitm), txt,
 	 nameditm, iaca_item_identll (nameditm));
-      iaca_item_pay_load_put_dictionnary_str (iaca.ia_topdictitm, txt,
+      iaca_item_pay_load_dictionnary_put_str (iaca.ia_topdictitm, txt,
 					      (IacaValue *) nameditm);
       iaca_debug ("created named '%s' %p #%lld", txt, nameditm,
 		  iaca_item_identll (nameditm));
@@ -456,15 +541,18 @@ iacamod_first_init1 (void)
 						IACAITEMEDITOR_SIMPLE_EDITING));
   iaca_debug ("itsimpleediting %p #%lld", itsimpleediting,
 	      iaca_item_identll (itsimpleediting));
+  g_assert (itsimpleediting);
+#if 0
   if (!itsimpleediting)
     {
       itsimpleediting = iaca_item_make (iacafirst_dsp);
       iaca_item_pay_load_closure_set_nth (ititemeditor,
 					  IACAITEMEDITOR_SIMPLE_EDITING,
 					  (IacaValue *) itsimpleediting);
-      iaca_item_pay_load_put_dictionnary_str
+      iaca_item_pay_load_dictionnary_put_str
 	(iaca.ia_topdictitm, "simple_editing", (IacaValue *) itsimpleediting);
       iaca_debug ("made itsimpleediting %p #%lld", itsimpleediting,
 		  iaca_item_identll (itsimpleediting));
     }
+#endif
 }

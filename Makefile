@@ -38,7 +38,7 @@ iaca: $(OBJECTFILES)
 $(OBJECTFILES): src/iaca.h
 
 clean:
-	$(RM) */*.o */*.so */*~ iaca *~ 
+	$(RM) */*.o */*.so */*~ iaca *~ core*
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
