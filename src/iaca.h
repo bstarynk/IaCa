@@ -543,6 +543,12 @@ enum iacaclofunsig_en
   IACACFSIG_two_values,
   /* application to three values */
   IACACFSIG_three_values,
+  /* application to one value and a long */
+  IACACFSIG_one_value_long,
+  /* application to two values and a long */
+  IACACFSIG_two_values_long,
+  /* application to three values and a long */
+  IACACFSIG_three_values_long,
   /* computed attribute */
   IACACFSIG_computed_attribute,
 };
@@ -588,6 +594,17 @@ struct iacaclofun_st
     IacaValue *(*cfunu_three_values) (IacaValue *, IacaValue *, IacaValue *,
 				      IacaItem *);
 #define cfun_three_values cfun_un.cfunu_three_values
+    /* when IACACFSIG_one_value_long (v1, l, cloitm) */
+    IacaValue *(*cfunu_one_value_long) (IacaValue *, long, IacaItem *);
+#define cfun_one_value_long cfun_un.cfunu_one_value_long
+    /* when IACACFSIG_two_values_long (v1, v2, l, cloitm) */
+    IacaValue *(*cfunu_two_values_long) (IacaValue *, IacaValue *, long,
+					 IacaItem *);
+#define cfun_two_values_long cfun_un.cfunu_two_values_long
+    /* when IACACFSIG_three_values_long (v1, v2, v3, l, cloitm) */
+    IacaValue *(*cfunu_three_values_long) (IacaValue *, IacaValue *,
+					   IacaValue *, long, IacaItem *);
+#define cfun_three_values_long cfun_un.cfunu_three_values_long
     struct
     {
       IacaValue *(*cfunu_get_attribute) (IacaItem *, IacaItem *, IacaValue *);
@@ -908,6 +925,69 @@ iaca_item_pay_load_closure_three_values (IacaValue *v1, IacaValue *v2,
   if (cfun->cfun_sig != IACACFSIG_three_values || !cfun->cfun_three_values)
     return NULL;
   return cfun->cfun_three_values (v1, v2, v3, cloitm);
+}
+
+static inline IacaValue *
+iaca_item_pay_load_closure_one_value_long (IacaValue *v1, long l,
+					   IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return NULL;
+  if (!(cfun = clo->clo_fun))
+    return NULL;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_one_value_long
+      || !cfun->cfun_one_value_long)
+    return NULL;
+  return cfun->cfun_one_value_long (v1, l, cloitm);
+}
+
+
+static inline IacaValue *
+iaca_item_pay_load_closure_two_values_long (IacaValue *v1, IacaValue *v2,
+					    long l, IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return NULL;
+  if (!(cfun = clo->clo_fun))
+    return NULL;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_two_values_long
+      || !cfun->cfun_two_values_long)
+    return NULL;
+  return cfun->cfun_two_values_long (v1, v2, l, cloitm);
+}
+
+
+static inline IacaValue *
+iaca_item_pay_load_closure_three_values_long (IacaValue *v1, IacaValue *v2,
+					      IacaValue *v3, long l,
+					      IacaItem *cloitm)
+{
+  const struct iacaclofun_st *cfun = 0;
+  struct iacapayloadclosure_st *clo = 0;
+  if (!cloitm || cloitm->v_kind != IACAV_ITEM)
+    return NULL;
+  if (cloitm->v_payloadkind != IACAPAYLOAD_CLOSURE
+      || !(clo = cloitm->v_payloadclosure))
+    return NULL;
+  if (!(cfun = clo->clo_fun))
+    return NULL;
+  g_assert (cfun->cfun_magic == IACA_CLOFUN_MAGIC);
+  if (cfun->cfun_sig != IACACFSIG_three_values_long
+      || !cfun->cfun_three_values_long)
+    return NULL;
+  return cfun->cfun_three_values_long (v1, v2, v3, l, cloitm);
 }
 
 /* the number of arguments should correspond to cfun */

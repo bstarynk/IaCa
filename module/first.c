@@ -56,6 +56,30 @@ IACA_DEFINE_CLOFUN (gtkapplinit,
 
 ////////////////////////////////////////////////////////////////
 
+/// edit the occurrence of an item
+enum iacaitemoccuredit_en
+{
+  IACAITEMOCCUREDIT__LAST
+};
+
+
+/* should return a boxed window or something else... */
+static IacaValue *
+iacafirst_itemoccuredit (IacaValue *v1, IacaValue *v2, long l,
+			 IacaItem *cloitm)
+{
+  IacaValue *res = NULL;
+  iaca_debug ("v1=%p v2=%p l=%ld cloitm=%p #%lld", v1, v2, l, cloitm,
+	      iaca_item_identll (cloitm));
+  return res;
+}
+
+IACA_DEFINE_CLOFUN (itemoccuredit,
+		    IACAITEMOCCUREDIT__LAST, two_values_long,
+		    iacafirst_itemoccuredit);
+
+////////////////////////////////////////////////////////////////
+
 /// closed values for item editor
 enum iacaitemeditorval_en
 {
