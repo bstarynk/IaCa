@@ -1,5 +1,5 @@
 ## file Iaca/Makefile
-## © 2011 Basile Starynkevitch 
+## © 2012 Basile Starynkevitch 
 ##   this file Makefile is part of IaCa 
 ##   IaCa is free software: you can redistribute it and/or modify
 ##   it under the terms of the GNU General Public License as published by
@@ -14,39 +14,32 @@
 ##   You should have received a copy of the GNU General Public License
 ##   along with IaCa.  If not, see <http://www.gnu.org/licenses/>.
 
-## the pkg-config list of required packages
-PACKAGES=gtk+-3.0 gmodule-2.0
-CC=gcc
-INDENT=indent
-CFLAGS= -std=gnu99 $(OPTIMFLAGS) $(PREPROFLAGS)
+CXX=g++
+ASTYLE=astyle
+CXXFLAGS= -std=gnu++11 $(OPTIMFLAGS)
+# fastcgi++ from http://www.nongnu.org/fastcgipp
+PACKAGES= fastcgi++
 OPTIMFLAGS= -Wall -g -O #-fno-inline
-PREPROFLAGS= -D_GNU_SOURCE -I src -I /usr/local/include \
-	$(shell pkg-config --cflags $(PACKAGES))
-LIBES= -L /usr/local/lib -ljansson $(shell pkg-config --libs $(PACKAGES))  -lgc -lrt -lm
-SOURCEFILES=$(wildcard src/*.c)
-OBJECTFILES=$(patsubst %.c,%.o,$(SOURCEFILES))
-MODULESRCFILES=$(wildcard module/*.c)
-MODULES=$(patsubst module/%.c, module/lib%.so,$(MODULESRCFILES))
+PREPROFLAGS= -D_GNU_SOURCE -I /usr/local/include $(pkg-config --cflags $(PACKAGES))
+LIBES= -L /usr/local/lib  $(pkg-config --libs $(PACKAGES)) -lboost_system -lrt -ldl
+SOURCES= $(wildcard iaca*.cc)
+OBJECTS= $(patsubst %.cc,%.o,$(SOURCES))
+
 .PHONY: all clean modules indent
 
-all: iaca modules
+all: iaca 
 	sync
 
-iaca: $(OBJECTFILES)
-	$(CC) -rdynamic $(CFLAGS) $^ -o $@ $(LIBES)
+iaca: $(OBJECTS)
+	$(LINK.cc) -rdynamic $^ -o $@ $(LIBES)
 
-$(OBJECTFILES): src/iaca.h
+$(OBJECTS): iaca.hh iaca.hh.gch
 
+iaca.hh.gch: iaca.hh
+	$(COMPILE.cc) $^ -c -o $@
 clean:
-	$(RM) */*.o */*.so */*~ iaca *~ core*
+	$(RM) *.o *.so *~ iaca *~ core* *.gch *.orig
 
-src/%.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-module/lib%.so: module/%.c iaca
-	$(CC)  -shared -fPIC $(CFLAGS) -DIACA_MODULE=\"$(basename $(notdir $<))\"  $< -o $@
-
-modules: $(MODULES)
 
 indent:
-	for f in */*.h */*.c; do $(INDENT) $$f; mv $$f~ $$f.bak;  $(INDENT) $$f; mv $$f.bak $$f~;  done
+	for f in *.hh *.cc; do $(ASTYLE) $$f;  done
