@@ -59,7 +59,7 @@ class MemorySegment {
     void* _client1;
     intptr_t _data[];
 protected:
-    static void* allocate(size_t alsz) throw (std::runtime_error);
+    static void* allocate(size_t alsz, bool exec=false) throw (std::runtime_error);
     static void deallocate(void*ptr, size_t sz);
     MemorySegment (enum segment_kind kind, void* end)
         : _magic(magic_number),
