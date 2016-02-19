@@ -3,4 +3,4 @@ iaca
 *.o
 *.so*
 *.gch
-
+iaca.moc.cc
