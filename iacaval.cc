@@ -20,19 +20,6 @@
 using namespace Iaca;
 
 
-ItemVal*
-IntVal::ikind() const {
-}
-
-
-ItemVal*
-DblVal::ikind() const {
-}
-
-ItemVal*
-StrVal::ikind() const {
-}
-
 StrCategory
 StrVal::category(const QString&qs)
 {
@@ -160,4 +147,144 @@ bool ValuePtr::less(const ValuePtr vp1, const ValuePtr vp2)
                              static_cast<const ItemVal*>(valp2));
     }
     throw std::runtime_error("unexpected kind");
+}
+
+const TupleVal*
+TupleVal::make_it(std::vector<ItemVal*>vecptr)
+{
+    assert (std::all_of(vecptr.begin(),vecptr.end(),
+    [](ItemVal*vptr) {
+        return vptr!=nullptr;
+    }));
+    return new TupleVal(vecptr.data(),vecptr.size());
+}
+
+const TupleVal*
+TupleVal::make_it(ItemVal**arr, unsigned siz)
+{
+    assert (std::all_of(arr,arr+siz,
+    [](ItemVal*vptr) {
+        return vptr!=nullptr;
+    }));
+    return new TupleVal(arr,siz);
+}
+
+void
+TupleVal::add(std::vector<ItemVal*>&vec, ValuePtr val)
+{
+    switch (val.kind()) {
+    case ValKind::Nil:
+    case ValKind::Int:
+    case ValKind::Dbl:
+    case ValKind::Str:
+        return;
+    case ValKind::Tuple:
+    case ValKind::Set:
+    {
+        auto seq = reinterpret_cast<const SeqItemsVal*>(val.get());
+        unsigned sz = seq->size();
+        for (unsigned ix=0; ix<sz; ix++) vec.push_back(seq->unsafe_at(ix));
+    }
+    return;
+    case ValKind::Item:
+        auto itm = reinterpret_cast<ItemVal*>(val.get());
+        vec.push_back(itm);
+        return;
+    }
+}
+
+
+
+void TupleVal::add(std::vector<ItemVal*>&vec, ItemPtr val)
+{
+    ItemVal*ptr = val.get();
+    if (ptr)
+        vec.push_back(ptr);
+}
+
+const TupleVal*
+TupleVal::make(std::initializer_list<ItemPtr>il)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(il.size());
+    for (ItemPtr itp : il) {
+        add(vec,itp);
+    };
+    return make_it(vec);
+}
+
+const TupleVal*
+TupleVal::make(std::initializer_list<ValuePtr>il)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(il.size());
+    for (ValuePtr vp : il) {
+        add(vec,vp);
+    };
+    return make_it(vec);
+}
+
+const TupleVal*
+TupleVal::make(const std::vector<ItemPtr>&ivec)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(ivec.size());
+    for (ItemPtr itp : ivec) {
+        add(vec,itp);
+    };
+    return make_it(vec);
+}
+
+const TupleVal*
+TupleVal::make(const std::vector<ValuePtr>&ivec)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(ivec.size());
+    for (ValuePtr vp : ivec) {
+        add(vec,vp);
+    };
+    return make_it(vec);
+}
+
+const TupleVal*
+TupleVal::make(const std::list<ItemPtr>&ilis)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(ilis.size());
+    for (ItemPtr itp : ilis) {
+        add(vec,itp);
+    };
+    return make_it(vec);
+}
+
+const TupleVal*
+TupleVal::make(const std::list<ValuePtr>&ilis)
+{
+    std::vector<ItemVal*> vec;
+    vec.reserve(ilis.size());
+    for (ValuePtr vp : ilis) {
+        add(vec,vp);
+    };
+    return make_it(vec);
+}
+
+Json::Value TupleVal::to_json(void) const {
+    Json::Value j {Json::objectValue};
+    Json::Value t {Json::arrayValue};
+    for (unsigned ix=0; ix<_slen; ix++)
+        t.append(_sarr[ix]->to_json());
+    j["kind"] = "tuple";
+    j["comp"] = t;
+    return j;
+}
+
+
+Json::Value SetVal::to_json(void) const {
+    Json::Value j {Json::objectValue};
+    Json::Value t {Json::arrayValue};
+    for (unsigned ix=0; ix<_slen; ix++)
+        t.append(_sarr[ix]->to_json());
+    j["kind"] = "set";
+    j["elem"] = t;
+    return j;
 }

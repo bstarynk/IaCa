@@ -102,7 +102,6 @@ struct ValuePtr : public std::shared_ptr<Value> {
 class Value {
 public:
     // every value has these
-    virtual ItemVal* ikind(void) const =0;
     virtual ValKind kind(void) const =0;
     virtual Json::Value to_json(void) const=0;
     virtual uint hash(void) const =0;
@@ -126,7 +125,6 @@ public:
     intptr_t val() const {
         return _ival;
     };
-    virtual ItemVal* ikind(void) const;
     virtual ValKind kind() const {
         return ValKind::Int;
     };
@@ -167,7 +165,6 @@ inline bool Value::less_val<IntVal>(const IntVal*i1, const IntVal*i2)
 class DblVal : public Value {
     const double _dval;
 public:
-    virtual ItemVal* ikind(void) const;
     virtual ValKind kind() const {
         return ValKind::Dbl;
     };
@@ -261,7 +258,6 @@ public:
     virtual ValKind kind() const {
         return ValKind::Str;
     };
-    virtual ItemVal* ikind(void) const;
     static StrVal* make(const QString&q) {
         if (q.isEmpty()) return nullptr;
         return new StrVal(q);
@@ -327,16 +323,26 @@ protected:
         return true;
     }
     static bool less(const SeqItemsVal*sq1, const SeqItemsVal*sq2);
+public:
+    unsigned size() const {
+        return _slen;
+    };
+    ItemVal* unsafe_at(unsigned ix) const {
+        return _sarr[ix];
+    };
 };
 
 class TupleVal : public SeqItemsVal {
     static constexpr const unsigned seed = 431;
     TupleVal( ItemVal*arr[], unsigned siz)
         : SeqItemsVal(arr,siz,seed) {};
+    // the item pointers below are never null
     static const TupleVal*make_it(std::vector<ItemVal*>vecptr);
     static const TupleVal*make_it(ItemVal**arr, unsigned siz);
 public:
-    virtual ItemVal* ikind(void) const;
+    static void add(std::vector<ItemVal*>&vec, ValuePtr val);
+    static void add(std::vector<ItemVal*>&vec, ItemPtr val);
+    virtual ~TupleVal() {};
     virtual ValKind kind() const {
         return ValKind::Tuple;
     };
@@ -352,10 +358,10 @@ public:
     }
     static const TupleVal*make(std::initializer_list<ItemPtr>il);
     static const TupleVal*make(std::initializer_list<ValuePtr>il);
-    static const TupleVal*make(std::vector<ItemPtr>vec);
-    static const TupleVal*make(std::vector<ValuePtr>vec);
-    static const TupleVal*make(std::list<ItemPtr>lis);
-    static const TupleVal*make(std::list<ValuePtr>lis);
+    static const TupleVal*make(const std::vector<ItemPtr>&vec);
+    static const TupleVal*make(const std::vector<ValuePtr>&vec);
+    static const TupleVal*make(const std::list<ItemPtr>&lis);
+    static const TupleVal*make(const std::list<ValuePtr>&lis);
 };
 template<>
 inline bool Value::same_val<TupleVal> (const TupleVal*tu1, const TupleVal*tu2)
@@ -376,8 +382,8 @@ class SetVal : public SeqItemsVal {
     static const SetVal*make_it(std::vector<ItemVal*>vecptr);
     static const SetVal*make_it(std::set<ItemPtr>vecptr);
     static const SetVal*make_it(ItemVal**arr, unsigned siz);
+    virtual ~SetVal() {};
 public:
-    virtual ItemVal* ikind(void) const;
     virtual ValKind kind() const {
         return ValKind::Set;
     };
@@ -393,10 +399,11 @@ public:
     }
     static const SetVal*make(std::initializer_list<ItemPtr>il);
     static const SetVal*make(std::initializer_list<ValuePtr>il);
-    static const SetVal*make(std::vector<ItemPtr>vec);
-    static const SetVal*make(std::vector<ValuePtr>vec);
-    static const SetVal*make(std::list<ItemPtr>lis);
-    static const SetVal*make(std::list<ValuePtr>lis);
+    static const SetVal*make(const std::vector<ItemPtr>&vec);
+    static const SetVal*make(const std::set<ItemPtr>&vec);
+    static const SetVal*make(const std::vector<ValuePtr>&vec);
+    static const SetVal*make(const std::list<ItemPtr>&lis);
+    static const SetVal*make(const std::list<ValuePtr>&lis);
 };
 template<>
 inline bool Value::same_val<SetVal> (const SetVal*tu1, const SetVal*tu2)
@@ -450,7 +457,6 @@ public:
     virtual uint hash(void) const {
         return _ihash;
     };
-    virtual ItemVal* ikind(void) const;
     virtual ValKind kind(void) const {
         return ValKind::Item;
     };
