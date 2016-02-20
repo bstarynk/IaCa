@@ -24,8 +24,8 @@ CFLAGS= $(OPTIMFLAGS)
 PACKAGES= jsoncpp Qt5Gui Qt5Widgets
 ## Qt5 needs -fPIC
 OPTIMFLAGS= -Wall -Wextra -g -O -fPIC #-fno-inline
-PREPROFLAGS= -D_GNU_SOURCE -I /usr/local/include $(shell pkg-config --cflags $(PACKAGES))
-LIBES= -L /usr/local/lib  $(shell pkg-config --libs $(PACKAGES)) -ldl
+PREPROFLAGS= -D_GNU_SOURCE  $(shell pkg-config --cflags $(PACKAGES))
+LIBES=  $(shell pkg-config --libs $(PACKAGES)) -ldl
 SOURCES= $(wildcard iaca*.cc)
 OBJECTS= $(patsubst %.cc,%.o,$(SOURCES)) iaca.moc.o
 QTMOC= moc
