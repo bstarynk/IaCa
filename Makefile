@@ -17,6 +17,8 @@
 CXX=g++
 ASTYLE=astyle
 CXXFLAGS= -std=gnu++11 $(OPTIMFLAGS)
+CC= gcc
+CFLAGS= $(OPTIMFLAGS)
 # jsoncpp is from https://github.com/open-source-parsers/jsoncpp
 # Qt5Gui is from Qt, see http://www.qt.io/download/ & http://doc.qt.io/qt-5/
 PACKAGES= jsoncpp Qt5Gui Qt5Widgets
@@ -25,7 +27,7 @@ OPTIMFLAGS= -Wall -Wextra -g -O -fPIC #-fno-inline
 PREPROFLAGS= -D_GNU_SOURCE -I /usr/local/include $(shell pkg-config --cflags $(PACKAGES))
 LIBES= -L /usr/local/lib  $(shell pkg-config --libs $(PACKAGES)) -ldl
 SOURCES= $(wildcard iaca*.cc)
-OBJECTS= $(patsubst %.cc,%.o,$(SOURCES)) iaca.moc.cc
+OBJECTS= $(patsubst %.cc,%.o,$(SOURCES)) iaca.moc.o
 QTMOC= moc
 
 .PHONY: all clean modules indent
@@ -33,8 +35,20 @@ QTMOC= moc
 all: iaca 
 	sync
 
+_timestamp.c: Makefile
+	@date +'const char iaca_timestamp[]="%c %Z";%nconst long long iaca_timeclock=%sLL;' > _timestamp.tmp
+	@(echo -n 'const char iaca_lastgitcommit[]="' ; \
+	   env LANG=C git diff --shortstat | awk '{if ($$1>0) printf "/%dF+%d-%d:", $$1, $$4, $$6}' ; \
+	   git log --format=oneline --abbrev=12 --abbrev-commit -q  \
+	     | head -1 | tr -d '\n\r\f\"' ; \
+	   echo '";') >> _timestamp.tmp
+	@(echo -n 'const char iaca_lastgittag[]="'; (git describe --abbrev=0 --all || echo '*notag*') | tr -d '\n\r\f\"'; echo '";') >> _timestamp.tmp
+	mv _timestamp.tmp _timestamp.c
+
 iaca: $(OBJECTS)
-	$(LINK.cc) -rdynamic $^ -o $@ $(LIBES)
+	$(MAKE) _timestamp.o
+	$(LINK.cc) -rdynamic $^ _timestamp.o -o $@ $(LIBES)
+	rm _timestamp.*
 
 iaca.moc.cc: iaca.hh
 	$(QTMOC) $< -o $@
@@ -44,7 +58,7 @@ $(OBJECTS): iaca.hh iaca.hh.gch
 iaca.hh.gch: iaca.hh
 	$(COMPILE.cc) $(PREPROFLAGS) $^ -c -o $@
 clean:
-	$(RM) *.o *.so *~ iaca *~ core* *.gch *.orig
+	$(RM) *.o *.so *~ iaca *~ core* *.gch *.orig _timestamp.*
 
 
 indent:

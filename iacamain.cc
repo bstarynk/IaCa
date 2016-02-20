@@ -19,15 +19,32 @@
 
 using namespace Iaca;
 
+bool Iaca::batch;
+
 int main(int argc, char**argv)
 {
-  QApplication app(argc,argv);
-  QApplication::setApplicationName("iaca");
-  QApplication::setApplicationVersion(version);
-  QCommandLineParser parser;
-  parser.setApplicationDescription("the IaCa system descr");
-  parser.addHelpOption();
-  parser.addVersionOption();
-  parser.process(app);
-  return app.exec();
+  batch = false;
+  std::unique_ptr<QCoreApplication> this_app;
+  for (int ix=1; ix<argc && !batch; ix++)
+    if (!strcmp(argv[ix],"--batch") || !strcmp(argv[ix],"-B"))
+      batch = true;
+  if (batch)
+    this_app.reset(new QCoreApplication(argc,argv));
+  else
+    this_app.reset(new QApplication(argc,argv));
+  this_app->setApplicationName("iaca");
+  this_app->setApplicationVersion(QString{iaca_lastgitcommit}.append(" (").append(iaca_timestamp).append(")"));
+  {
+    QCommandLineParser parser;
+    parser.setApplicationDescription("the IaCa system descr");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addOptions({
+	{{"b","batch"},
+	    QCoreApplication::translate("main","Run in batch mode without GUI.")
+	      }
+      });
+    parser.process(*this_app);
+  }
+  return this_app->exec();
 }
