@@ -90,3 +90,74 @@ bool SeqItemsVal::less(const SeqItemsVal*sq1, const SeqItemsVal*sq2) {
             sq2->_sarr,sq2->_sarr+sq2->_slen,
             ItemVal::less);
 }
+
+
+bool ValuePtr::same(const ValuePtr vp1, const ValuePtr vp2)
+{
+    const Value*valp1 = vp1.get();
+    const Value*valp2 = vp2.get();
+    if (valp1 == valp2) return true;
+    if (!valp1 || !valp2) return false;
+    auto k1 = valp1->kind();
+    auto k2 = valp2->kind();
+    if (k1 != k2) return false;
+    switch (k1) {
+    case ValKind::Nil:
+        abort();
+    case ValKind::Int:
+        return IntVal::same(static_cast<const IntVal*>(valp1),
+                            static_cast<const IntVal*>(valp2));
+    case ValKind::Dbl:
+        return DblVal::same(static_cast<const DblVal*>(valp1),
+                            static_cast<const DblVal*>(valp2));
+    case ValKind::Str:
+        return StrVal::same(static_cast<const StrVal*>(valp1),
+                            static_cast<const StrVal*>(valp2));
+    case ValKind::Tuple:
+        return TupleVal::same(static_cast<const TupleVal*>(valp1),
+                              static_cast<const TupleVal*>(valp2));
+    case ValKind::Set:
+        return SetVal::same(static_cast<const SetVal*>(valp1),
+                            static_cast<const SetVal*>(valp2));
+    case ValKind::Item:
+        return ItemVal::same(static_cast<const ItemVal*>(valp1),
+                             static_cast<const ItemVal*>(valp2));
+    }
+    throw std::runtime_error("unexpected kind");
+}
+
+bool ValuePtr::less(const ValuePtr vp1, const ValuePtr vp2)
+{
+    const Value*valp1 = vp1.get();
+    const Value*valp2 = vp2.get();
+    if (valp1 == valp2) return false;
+    if (!valp1) return true;
+    if (!valp2) return false;
+    auto k1 = valp1->kind();
+    auto k2 = valp2->kind();
+    if (k1 < k2) return true;
+    if (k1 > k2) return false;
+    switch (k1) {
+    case ValKind::Nil:
+        abort();
+    case ValKind::Int:
+        return IntVal::less(static_cast<const IntVal*>(valp1),
+                            static_cast<const IntVal*>(valp2));
+    case ValKind::Dbl:
+        return DblVal::less(static_cast<const DblVal*>(valp1),
+                            static_cast<const DblVal*>(valp2));
+    case ValKind::Str:
+        return StrVal::less(static_cast<const StrVal*>(valp1),
+                            static_cast<const StrVal*>(valp2));
+    case ValKind::Tuple:
+        return TupleVal::less(static_cast<const TupleVal*>(valp1),
+                              static_cast<const TupleVal*>(valp2));
+    case ValKind::Set:
+        return SetVal::less(static_cast<const SetVal*>(valp1),
+                            static_cast<const SetVal*>(valp2));
+    case ValKind::Item:
+        return ItemVal::less(static_cast<const ItemVal*>(valp1),
+                             static_cast<const ItemVal*>(valp2));
+    }
+    throw std::runtime_error("unexpected kind");
+}

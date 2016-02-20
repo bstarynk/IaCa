@@ -23,6 +23,8 @@
 #include <cctype>
 #include <fstream>
 #include <cmath>
+#include <set>
+#include <vector>
 #include <map>
 #include <memory>
 #include <random>
@@ -52,6 +54,16 @@ class Value;
 class Payload;
 class ItemVal;
 
+enum class ValKind :uint8_t {
+    Nil,
+    Int,
+    Dbl,
+    Str,
+    Item,
+    Tuple,
+    Set,
+};
+
 extern bool batch;
 
 struct ItemPtr : public std::shared_ptr<ItemVal> {
@@ -62,17 +74,36 @@ struct ItemPtr : public std::shared_ptr<ItemVal> {
         return ip1.get() == ip2.get();
     };
     static inline bool less(const ItemPtr ip1, const ItemPtr ip2);
+    bool operator == (const ItemPtr ipr) const {
+        return same(*this,ipr);
+    };
+    bool operator < (const ItemPtr ipr) const {
+        return less (*this,ipr);
+    };
+    ValKind kind() const {
+        return get()?ValKind::Item:ValKind::Nil;
+    };
 };
 
 struct ValuePtr : public std::shared_ptr<Value> {
     inline Json::Value to_json(void) const;
+    inline ValKind kind(void) const;
     inline void scan_items(std::function<bool(ItemVal*)>) ;
+    static bool same(const ValuePtr vp1, const ValuePtr vp2);
+    static bool less(const ValuePtr vp1, const ValuePtr vp2);
+    bool operator == (const ValuePtr vpr) const {
+        return same(*this,vpr);
+    };
+    bool operator < (const ValuePtr vpr) const {
+        return less (*this,vpr);
+    };
 };
 
 class Value {
 public:
     // every value has these
     virtual ItemVal* ikind(void) const =0;
+    virtual ValKind kind(void) const =0;
     virtual Json::Value to_json(void) const=0;
     virtual uint hash(void) const =0;
     virtual void scan_items(std::function<bool(ItemVal*)> scanfun)= 0;
@@ -96,6 +127,9 @@ public:
         return _ival;
     };
     virtual ItemVal* ikind(void) const;
+    virtual ValKind kind() const {
+        return ValKind::Int;
+    };
     virtual void scan_items(std::function<bool(ItemVal*)>) {};
     virtual uint hash(void) const {
         uint h = qHash(_ival);
@@ -134,6 +168,9 @@ class DblVal : public Value {
     const double _dval;
 public:
     virtual ItemVal* ikind(void) const;
+    virtual ValKind kind() const {
+        return ValKind::Dbl;
+    };
     virtual void scan_items(std::function<bool(ItemVal*)>) {};
     double val() const {
         return _dval;
@@ -221,6 +258,9 @@ public:
     virtual Json::Value to_json(void) const {
         return Json::Value {val().toStdString()};
     };
+    virtual ValKind kind() const {
+        return ValKind::Str;
+    };
     virtual ItemVal* ikind(void) const;
     static StrVal* make(const QString&q) {
         if (q.isEmpty()) return nullptr;
@@ -260,6 +300,9 @@ protected:
     const uint _shash;
     const unsigned _slen;
     ItemVal**_sarr;
+    uint seq_hash () const {
+        return _shash;
+    };
     SeqItemsVal(ItemVal* arr[], unsigned siz, unsigned seed)
         : _shash(hash_itemsarr(arr,siz,seed)),
           _slen(siz),
@@ -290,12 +333,82 @@ class TupleVal : public SeqItemsVal {
     static constexpr const unsigned seed = 431;
     TupleVal( ItemVal*arr[], unsigned siz)
         : SeqItemsVal(arr,siz,seed) {};
+    static const TupleVal*make_it(std::vector<ItemVal*>vecptr);
+    static const TupleVal*make_it(ItemVal**arr, unsigned siz);
 public:
+    virtual ItemVal* ikind(void) const;
+    virtual ValKind kind() const {
+        return ValKind::Tuple;
+    };
     virtual uint hash(void) const {
         return _shash;
     };
     virtual Json::Value to_json(void) const;
+    static bool same(const TupleVal*tu1, const TupleVal*tu2) {
+        return SeqItemsVal::same(tu1,tu2);
+    }
+    static bool less(const TupleVal*tu1, const TupleVal*tu2) {
+        return SeqItemsVal::less(tu1,tu2);
+    }
+    static const TupleVal*make(std::initializer_list<ItemPtr>il);
+    static const TupleVal*make(std::initializer_list<ValuePtr>il);
+    static const TupleVal*make(std::vector<ItemPtr>vec);
+    static const TupleVal*make(std::vector<ValuePtr>vec);
+    static const TupleVal*make(std::list<ItemPtr>lis);
+    static const TupleVal*make(std::list<ValuePtr>lis);
 };
+template<>
+inline bool Value::same_val<TupleVal> (const TupleVal*tu1, const TupleVal*tu2)
+{
+    return TupleVal::same(tu1,tu2);
+};
+template<>
+inline bool Value::less_val<TupleVal>(const TupleVal*tu1, const TupleVal*tu2)
+{
+    return TupleVal::less(tu1,tu2);
+};
+
+
+class SetVal : public SeqItemsVal {
+    static constexpr const unsigned seed = 541;
+    SetVal( ItemVal*arr[], unsigned siz)
+        : SeqItemsVal(arr,siz,seed) {};
+    static const SetVal*make_it(std::vector<ItemVal*>vecptr);
+    static const SetVal*make_it(std::set<ItemPtr>vecptr);
+    static const SetVal*make_it(ItemVal**arr, unsigned siz);
+public:
+    virtual ItemVal* ikind(void) const;
+    virtual ValKind kind() const {
+        return ValKind::Set;
+    };
+    virtual uint hash(void) const {
+        return _shash;
+    };
+    virtual Json::Value to_json(void) const;
+    static bool same(const SetVal*tu1, const SetVal*tu2) {
+        return SeqItemsVal::same(tu1,tu2);
+    }
+    static bool less(const SetVal*tu1, const SetVal*tu2) {
+        return SeqItemsVal::less(tu1,tu2);
+    }
+    static const SetVal*make(std::initializer_list<ItemPtr>il);
+    static const SetVal*make(std::initializer_list<ValuePtr>il);
+    static const SetVal*make(std::vector<ItemPtr>vec);
+    static const SetVal*make(std::vector<ValuePtr>vec);
+    static const SetVal*make(std::list<ItemPtr>lis);
+    static const SetVal*make(std::list<ValuePtr>lis);
+};
+template<>
+inline bool Value::same_val<SetVal> (const SetVal*tu1, const SetVal*tu2)
+{
+    return SetVal::same(tu1,tu2);
+};
+template<>
+inline bool Value::less_val<SetVal>(const SetVal*tu1, const SetVal*tu2)
+{
+    return SetVal::less(tu1,tu2);
+};
+
 
 class Payload {
     ItemVal* _owneritem;
@@ -336,6 +449,10 @@ public:
     static bool valid_radix(const QString&);
     virtual uint hash(void) const {
         return _ihash;
+    };
+    virtual ItemVal* ikind(void) const;
+    virtual ValKind kind(void) const {
+        return ValKind::Item;
     };
     virtual Json::Value to_json(void) const {
         Json::Value js {Json::objectValue};
@@ -378,10 +495,27 @@ void ItemPtr::scan_items(std::function<bool(ItemVal*)>scanfun)  {
 }
 
 
+bool ItemPtr::less(const ItemPtr ip1, const ItemPtr ip2)
+{
+    const ItemVal*ptr1 = ip1.get();
+    const ItemVal*ptr2 = ip2.get();
+    if (ptr1 == ptr2) return false;
+    if (!ptr1) return true;
+    if (!ptr2) return false;
+    return ItemVal::less(ptr1,ptr2);
+}
+
 Json::Value ValuePtr::to_json(void) const {
     const Value*pval = get();
     if (pval) return pval->to_json();
     else return nullptr;
+}
+
+
+ValKind ValuePtr::kind(void) const {
+    const Value*pval = get();
+    if (pval) return pval->kind();
+    else return ValKind::Nil;
 }
 
 void ValuePtr::scan_items(std::function<bool(ItemVal*)>scanfun)  {
